@@ -1,6 +1,6 @@
 # Budget app, NiceGUI version.
 # launch by double-clicking budget-app/app/run.command, or from a terminal:
-#   cd ~/Desktop/Claude/budget-app/app && ../userdata/venv/bin/python app.py
+#   cd ~/budget-app/app && ../userdata/venv/bin/python app.py
 # the browser opens automatically at http://localhost:8080.
 from __future__ import annotations
 

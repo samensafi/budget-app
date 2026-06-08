@@ -62,13 +62,12 @@ find_app_dir() {
   [ -n "$self_dir" ] && [ -f "$self_dir/run.command" ] && { printf '%s\n' "$self_dir"; return 0; }
   local g
   for g in \
-    "$HOME/Desktop/Claude/budget-app/app" \
+    "$HOME/budget-app/app" \
     "$HOME/Desktop/budget-app/app" \
     "$HOME/Documents/budget-app/app" \
     "$HOME/Downloads/budget-app/app" \
     "$HOME/Applications/budget-app/app" \
-    "/Applications/budget-app/app" \
-    "$HOME/budget-app/app"; do
+    "/Applications/budget-app/app"; do
     [ -f "$g/run.command" ] && { printf '%s\n' "$g"; return 0; }
   done
   local hit
