@@ -32,6 +32,24 @@ isn't already on your Mac.
 
 ## Installing
 
+There are two ways. Most people want the first.
+
+### The app (easiest)
+
+Go to the [Releases page](https://github.com/samensafi/budget-app/releases/latest),
+download `Budget.zip`, unzip it, and move `Budget` to your Applications folder.
+
+The first time you open it, right-click (or Control-click) the Budget app, choose
+Open, then Open again. macOS shows this prompt once for any app that is not from
+the App Store. After that you just double-click it like any other app.
+
+On first launch Budget downloads everything it needs (the right Python version
+and the libraries, into a private folder of its own) and then opens in your
+browser. This takes a few minutes the first time and a second or two after that.
+It checks for updates and updates itself on each launch.
+
+### From source (for developers)
+
 Clone the repository into an `app` folder and start it:
 
 ```
@@ -40,14 +58,10 @@ cd budget-app/app
 ./run.command
 ```
 
-The first launch downloads the right Python version and the libraries the app
-needs into a private `userdata` folder next to the code, which takes a few
-minutes. After that it starts in a second or two and opens at
-http://localhost:8080.
-
-The first time you open `run.command` by double-clicking, macOS may say it is
-from an unidentified developer. Right-click the file, choose Open, then Open
-again. You only have to do that once.
+The first launch sets up a private `userdata` folder next to the code and opens
+at http://localhost:8080. The first time you open `run.command` by
+double-clicking, macOS may say it is from an unidentified developer. Right-click
+the file, choose Open, then Open again. You only have to do that once.
 
 ## Running it
 
@@ -57,10 +71,11 @@ browser tab and press Ctrl+C in the window that opened.
 
 ## Updating
 
-To update, run `git pull` in the `app` folder and start it again. Updates only
-change the code, never your `userdata` folder, so your data stays exactly as it
-was. If you use the optional launcher app, it pulls updates for you on each
-launch.
+The Budget app updates itself on each launch, and tells you when it has. You can
+also check any time from Settings, under Updates, with Check for updates. From
+source, run `git pull` in the `app` folder and start it again. Either way updates
+only change the code, never your `userdata` folder, so your data stays exactly as
+it was.
 
 ## Where your data lives
 
