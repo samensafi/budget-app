@@ -21,23 +21,46 @@ needs an Anthropic API key. Everything else works without one.
 ## Requirements
 
 - macOS
-- Python 3
+- Git. macOS offers to install it the first time it is used.
+- An internet connection the first time, to download the app and set it up.
 - An Anthropic API key, only if you want uploads read for you. You paste it into
   Settings inside the app.
 
-## Running it
+You do not need to install Python yourself. Setup downloads the exact version
+the app needs into its own folder, so it does not matter which Python is or
+isn't already on your Mac.
 
-Double-click `run.command`. The first launch builds a private Python environment
-next to the app, which takes a few minutes. After that it starts in a second or
-two and opens at http://localhost:8080.
+## Installing
 
-You can also start it from a terminal in this folder:
+Clone the repository into an `app` folder and start it:
 
 ```
+git clone https://github.com/samensafi/budget-app.git budget-app/app
+cd budget-app/app
 ./run.command
 ```
 
-To stop it, close the browser tab and press Ctrl+C in the window that opened.
+The first launch downloads the right Python version and the libraries the app
+needs into a private `userdata` folder next to the code, which takes a few
+minutes. After that it starts in a second or two and opens at
+http://localhost:8080.
+
+The first time you open `run.command` by double-clicking, macOS may say it is
+from an unidentified developer. Right-click the file, choose Open, then Open
+again. You only have to do that once.
+
+## Running it
+
+Double-click `run.command`, or from a terminal in the `app` folder run
+`./run.command`. It opens at http://localhost:8080. To stop it, close the
+browser tab and press Ctrl+C in the window that opened.
+
+## Updating
+
+To update, run `git pull` in the `app` folder and start it again. Updates only
+change the code, never your `userdata` folder, so your data stays exactly as it
+was. If you use the optional launcher app, it pulls updates for you on each
+launch.
 
 ## Where your data lives
 
