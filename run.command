@@ -3,7 +3,8 @@
 #
 # First launch  : sets up a private Python environment inside userdata/venv
 #                 (a few minutes, one time only), then opens Budget in your
-#                 web browser.
+#                 web browser. The exact Python version Budget needs is
+#                 downloaded automatically, so it works the same on every Mac.
 # Later launches: starts right away.
 #
 # All your data (budget.db, your backups, and this Python environment) lives
@@ -27,31 +28,42 @@ if pkill -f "$HERE/app.py" >/dev/null 2>&1; then
   sleep 1   # the old copy quits instantly, give it a moment to release the port
 fi
 
-# 1. Budget needs Python 3.
-if ! command -v python3 >/dev/null 2>&1; then
-  echo ""
-  echo "Budget needs Python 3, which isn't installed on this Mac yet."
-  echo "Install it from  https://www.python.org/downloads/  then run this again."
-  echo ""
-  read -n 1 -s -r -p "Press any key to close this window."
-  exit 1
-fi
-
 mkdir -p "$DATA"
 
 VENV="$DATA/venv"
 PYBIN="$VENV/bin/python"
 STAMP="$VENV/.requirements.sha"
 
-# 2. Create the private environment on first run (kept in userdata/, never shared).
+# 1. Find uv, the tool that builds Budget's private environment. It pins the
+#    exact Python version Budget needs (see .python-version), downloading it if
+#    this Mac doesn't have it, so the app behaves the same everywhere. Install
+#    uv once if it isn't here yet.
+if command -v uv >/dev/null 2>&1; then
+  UV="$(command -v uv)"
+elif [ -x "$HOME/.local/bin/uv" ]; then
+  UV="$HOME/.local/bin/uv"
+else
+  echo "Setting up Budget for the first time. Getting a small helper (uv)..."
+  export UV_INSTALL_DIR="$HOME/.local/bin"
+  curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
+  UV="$HOME/.local/bin/uv"
+  if [ ! -x "$UV" ]; then
+    echo ""
+    echo "Could not set up Budget's helper tool. Check your internet connection and run this again."
+    read -n 1 -s -r -p "Press any key to close this window."
+    exit 1
+  fi
+fi
+
+# 2. Create the private environment on first run (kept in userdata/, never
+#    shared). uv fetches the right Python version automatically.
 if [ ! -x "$PYBIN" ]; then
   echo "Setting up Budget for the first time. This takes a few minutes..."
-  if ! python3 -m venv "$VENV"; then
+  if ! "$UV" venv "$VENV" --python 3.11 >/dev/null 2>&1; then
     echo "Could not create the Python environment."
     read -n 1 -s -r -p "Press any key to close this window."
     exit 1
   fi
-  "$PYBIN" -m pip install --upgrade pip >/dev/null 2>&1
 fi
 
 # 3. Install the libraries Budget needs, but only when requirements.txt has
@@ -61,7 +73,7 @@ WANT="$(shasum requirements.txt | awk '{print $1}')"
 HAVE="$(cat "$STAMP" 2>/dev/null)"
 if [ "$WANT" != "$HAVE" ]; then
   echo "Installing the libraries Budget needs (one time)..."
-  if "$PYBIN" -m pip install -r requirements.txt; then
+  if "$UV" pip install --python "$PYBIN" -r requirements.txt; then
     echo "$WANT" > "$STAMP"
   else
     echo ""
