@@ -10,10 +10,11 @@
 # contract changes (see app/CLAUDE.md, item 8), update this file and re-paste
 # it into Automator. Editing the .app does not update this file and vice versa.
 #
-# What it does: finds the app folder on its own (no hardcoded path, asks you if
-# it truly can't find it), runs the server silently in managed mode, sets
-# itself up on first run, and shuts everything down the moment the app's Safari
-# tab/window is closed.
+# What it does: finds the app folder on its own (no hardcoded path); if Budget
+# isn't installed yet it offers to download it from GitHub; pulls the latest
+# code on each launch so the app keeps itself updated; runs the server silently
+# in managed mode, sets itself up on first run, and shuts everything down the
+# moment the app's Safari tab/window is closed.
 
 PORT=8080
 # Use the numeric IPv4 loopback, not localhost. On macOS localhost resolves to
@@ -26,6 +27,8 @@ PORT=8080
 # health check, and the watchdog's tab match below, they must stay in sync.
 HOST="127.0.0.1"
 CONFIG_FILE="$HOME/.budget-app-path"     # remembers a manually-entered path
+REPO_URL="https://github.com/samensafi/budget-app.git"  # where to download Budget from
+INSTALL_PARENT="$HOME/budget-app"        # a fresh install goes here ($INSTALL_PARENT/app)
 
 note() { osascript -e "display dialog \"$1\" buttons {\"OK\"} default button 1 with icon caution with title \"Budget\"" >/dev/null 2>&1; }
 
@@ -95,8 +98,39 @@ prompt_for_path() {
   done
 }
 
+# Not installed anywhere? Offer to download it from GitHub into ~/budget-app/app.
+# Needs Git (macOS installs it on first use). Code only, the data folder is made
+# later on first run. Echoes the new app/ dir, or returns 1.
+offer_install() {
+  local ans
+  ans="$(osascript \
+    -e 'try' \
+    -e 'set r to display dialog "Budget is not installed on this Mac yet. Download and install it now? It goes in your home folder and takes a few minutes the first time." with title "Budget" buttons {"Cancel", "Install"} default button "Install"' \
+    -e 'return button returned of r' \
+    -e 'on error' \
+    -e 'return "Cancel"' \
+    -e 'end try' 2>/dev/null)"
+  [ "$ans" != "Install" ] && return 1
+
+  if ! command -v git >/dev/null 2>&1; then
+    xcode-select --install >/dev/null 2>&1
+    note "Budget needs Git to install and keep itself updated. A macOS Command Line Tools window should appear, click Install, wait for it to finish, then open Budget again."
+    return 1
+  fi
+
+  osascript -e 'display notification "Downloading Budget. This takes a few minutes and it will open by itself when ready." with title "Budget"' >/dev/null 2>&1
+  mkdir -p "$INSTALL_PARENT"
+  if git clone "$REPO_URL" "$INSTALL_PARENT/app" >/dev/null 2>&1 && [ -f "$INSTALL_PARENT/app/run.command" ]; then
+    printf '%s' "$INSTALL_PARENT/app" > "$CONFIG_FILE" 2>/dev/null   # remember it
+    printf '%s\n' "$INSTALL_PARENT/app"; return 0
+  fi
+  note "Budget could not be downloaded. Check your internet connection and open Budget again."
+  return 1
+}
+
 APP_DIR="$(find_app_dir)"
-[ -z "$APP_DIR" ] && APP_DIR="$(prompt_for_path)"
+[ -z "$APP_DIR" ] && APP_DIR="$(offer_install)"    # not installed yet? download it
+[ -z "$APP_DIR" ] && APP_DIR="$(prompt_for_path)"  # or point at an existing copy
 if [ -z "$APP_DIR" ]; then
   note "Budget needs the location of its folder to start. Open Budget again when you can point it to the budget-app folder."
   exit 1
@@ -150,10 +184,12 @@ trap 'kill_app; exit 0' INT TERM
 # 0. Kill any older / leftover copy first.
 kill_app
 
-# 1. Budget needs Python 3 (the only blocker on a brand-new Mac).
-if ! command -v python3 >/dev/null 2>&1; then
-  note "Budget needs Python 3, which isn't installed on this Mac yet. Install it from python.org/downloads, then open Budget again."
-  exit 1
+# 1. Keep Budget up to date. If this is a git copy and we are online, pull the
+#    latest code before starting. Never blocks startup, if it fails (offline, or
+#    no git) we just run the version already on disk. Updates only change code in
+#    app/, never the userdata/ folder, so your data is never touched.
+if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C "$APP_DIR" pull --ff-only >/dev/null 2>&1 || true
 fi
 
 # 2. First run? (no venv yet), allow a long, silent one-time setup and
