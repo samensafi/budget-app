@@ -4,6 +4,11 @@ CLAUDE.md
 test_all.py
 pack-to-send.command
 
+# the built double-click app and its upload zip, made by build-app.command. these go on
+# the GitHub Releases page, never into the repo (the bundle holds its own launcher copy)
+Budget.app/
+Budget.zip
+
 # crash log and python caches
 crash.log
 __pycache__/
