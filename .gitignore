@@ -1,0 +1,29 @@
+# personal notes and local-only files, not part of the public app
+HANDOFF.md
+CLAUDE.md
+test_all.py
+pack-to-send.command
+
+# crash log and python caches
+crash.log
+__pycache__/
+*.pyc
+*.pyo
+
+# a stray virtualenv, the real one lives in userdata but never commit one made in here
+.venv/
+venv/
+
+# local secrets, the app keeps its key in the database, not in a file like this
+.env
+
+# editor folders
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+._*
+
+# per-user data, kept outside the app but ignored just in case
+userdata/
