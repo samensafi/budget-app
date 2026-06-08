@@ -189,7 +189,12 @@ kill_app
 #    no git) we just run the version already on disk. Updates only change code in
 #    app/, never the userdata/ folder, so your data is never touched.
 if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  before="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null)"
   git -C "$APP_DIR" pull --ff-only >/dev/null 2>&1 || true
+  after="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null)"
+  if [ -n "$before" ] && [ -n "$after" ] && [ "$before" != "$after" ]; then
+    osascript -e 'display notification "Budget was updated to the latest version." with title "Budget"' >/dev/null 2>&1
+  fi
 fi
 
 # 2. First run? (no venv yet), allow a long, silent one-time setup and

@@ -134,3 +134,18 @@ def _relative_time_ago(ts: str | None) -> str:
 def _expense_category_names(all_names: list[str]) -> list[str]:
     # Income is reserved for income and Other was retired so neither is selectable here
     return [c for c in all_names if c not in ("Income", "Other")]
+
+
+def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str) -> tuple[str, str]:
+    # turn raw git facts into what the Updates panel should show. pure so it tests without
+    # a real repo. states: not_git (copy has no git, can't self-update), unknown (couldn't
+    # reach github or read the commits), current (already newest), available (github ahead).
+    if not is_repo:
+        return ("not_git", "This copy was not installed with Git, so it can't update "
+                           "itself. Re-download Budget to get the latest version.")
+    if not fetch_ok or not local or not remote:
+        return ("unknown", "Couldn't reach GitHub to check for updates. Check your "
+                           "internet connection and try again.")
+    if local == remote:
+        return ("current", "Budget is up to date.")
+    return ("available", "A new version of Budget is available.")

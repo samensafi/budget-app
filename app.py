@@ -11,6 +11,7 @@ import io
 import math
 import os
 import re
+import subprocess
 import sys
 import threading
 import traceback
@@ -52,6 +53,7 @@ from logic import (  # noqa: F401  re-exported for callers and tests
     _should_retry_with_vision,
     _relative_time_ago,
     _expense_category_names,
+    _update_state,
 )
 
 
@@ -152,6 +154,7 @@ os.environ["PYTHONWARNINGS"] = (
 # userdata/budget.db, the guard would then see the destination exists, and the real data
 # would be orphaned at the old location.
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+APP_CODE_DIR = Path(__file__).resolve().parent   # = app/, the git checkout (for self-update)
 USERDATA_DIR = PROJECT_DIR / "userdata"
 USERDATA_DIR.mkdir(exist_ok=True)
 
@@ -733,6 +736,12 @@ def index():
         with ui.tab_panel(tab_settings):
             containers["settings"] = ui.column().classes("w-full")
             refresh_settings()
+
+    # if the startup check found a newer version on github, let this tab know once with a
+    # gentle pointer to Settings. fires just after load so it doesn't race the page build.
+    if _update_available:
+        ui.timer(1.0, lambda: ui.notify("An update is available. Open Settings to update Budget.",
+                                        type="info", timeout=6000), once=True)
 
 
 def _render_api_chip():
@@ -3271,6 +3280,74 @@ def _render_categories_inner():
     ui.separator().style("margin: 8px 0 18px;")
 
 
+# self-update over git. the app folder is the public github checkout, so checking for a
+# newer version is a fetch plus a commit compare, and installing one is a fast-forward
+# pull (code only, never userdata/). every git call is best-effort: a missing git, no
+# network, or a copy that was unzipped instead of cloned just yields a calm message and
+# changes nothing. all of this runs off the event loop (asyncio.to_thread / a daemon
+# thread) so the UI never blocks. _update_state in logic.py turns the raw facts into the
+# state the Settings panel shows, and is unit-tested without a real repo.
+_update_available = False   # set by the one-shot startup check; drives the Settings hint
+
+
+def _git(*args: str, timeout: int = 30) -> tuple[bool, str]:
+    # run a git command inside the app folder. returns (ok, trimmed stdout). never raises:
+    # no git, a non-zero exit, or a timeout all come back as (False, "").
+    try:
+        r = subprocess.run(["git", "-C", str(APP_CODE_DIR), *args],
+                           capture_output=True, text=True, timeout=timeout)
+        return (r.returncode == 0, (r.stdout or "").strip())
+    except Exception:
+        return (False, "")
+
+
+def _is_git_checkout() -> bool:
+    ok, out = _git("rev-parse", "--is-inside-work-tree")
+    return ok and out == "true"
+
+
+def check_for_update(do_fetch: bool = True) -> tuple[str, str]:
+    # compare the local commit with what's on github. returns (state, message) from
+    # logic._update_state. fetch first so the comparison sees the latest remote.
+    if not _is_git_checkout():
+        return _update_state(False, False, "", "")
+    fetch_ok = True
+    if do_fetch:
+        fetch_ok, _ = _git("fetch", "--quiet", "origin")
+    _, local = _git("rev-parse", "HEAD")
+    ok_r, remote = _git("rev-parse", "@{u}")     # the tracked upstream (origin/main)
+    if not ok_r:
+        ok_r, remote = _git("rev-parse", "origin/main")
+    return _update_state(True, fetch_ok, local, remote if ok_r else "")
+
+
+def apply_update() -> tuple[bool, str]:
+    # pull the latest code. ff-only so it never creates a merge or touches local edits.
+    # the app does not hot-reload, so the new code applies on the next launch.
+    ok, _ = _git("pull", "--ff-only")
+    if ok:
+        return (True, "Update installed. Quit Budget and open it again to finish.")
+    return (False, "Couldn't install the update. Check your internet connection and try again.")
+
+
+def _startup_update_check() -> None:
+    # one quiet background check at launch so Settings can show an update is waiting and
+    # each browser tab gets a gentle heads-up. failures are swallowed, it's best-effort.
+    global _update_available
+    try:
+        st, _ = check_for_update(do_fetch=True)
+        _update_available = (st == "available")
+    except Exception:
+        _update_available = False
+
+
+def _start_update_check() -> None:
+    threading.Thread(target=_startup_update_check, daemon=True).start()
+
+
+app.on_startup(_start_update_check)
+
+
 # settings tab
 
 def refresh_settings():
@@ -3640,6 +3717,47 @@ def _render_settings_inner():
         .props("outline dense").style("margin-top: 10px;")
     if n_deleted == 0:
         view_btn.disable()
+
+    # updates. checks github for a newer version and installs it on click. the check and
+    # the pull run off the event loop so the panel never freezes. a copy without git just
+    # gets told it can't self-update. the startup check may have already flagged one, in
+    # which case the Update now button is shown straight away.
+    ui.separator().style("margin: 18px 0;")
+    ui.label("Updates").classes("text-h6")
+    upd_status = ui.label("Check whether a newer version of Budget is available.") \
+        .classes("text-caption text-muted")
+
+    async def do_check_update():
+        upd_check.disable()
+        upd_install.set_visibility(False)
+        upd_status.set_text("Checking for updates...")
+        st, msg = await asyncio.to_thread(check_for_update, True)
+        upd_status.set_text(msg)
+        upd_install.set_visibility(st == "available")
+        upd_check.enable()
+
+    async def do_apply_update():
+        upd_install.disable()
+        upd_check.disable()
+        upd_status.set_text("Installing the update...")
+        ok, msg = await asyncio.to_thread(apply_update)
+        upd_status.set_text(msg)
+        ui.notify(msg, type="positive" if ok else "warning", timeout=0 if ok else 4000)
+        if ok:
+            upd_install.set_visibility(False)
+        else:
+            upd_install.enable()
+        upd_check.enable()
+
+    with ui.row().classes("gap-2 items-center").style("margin-top: 8px;"):
+        upd_check = ui.button("Check for updates", icon="refresh", on_click=do_check_update) \
+            .props("outline dense")
+        upd_install = ui.button("Update now", icon="download", on_click=do_apply_update) \
+            .props("unelevated dense color=primary")
+    upd_install.set_visibility(False)
+    if _update_available:
+        upd_status.set_text("A new version of Budget is available.")
+        upd_install.set_visibility(True)
 
     ui.separator().style("margin: 18px 0;")
     ui.label("Danger zone").classes("text-h6").style("color: var(--bb-expense);")
