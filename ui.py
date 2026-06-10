@@ -84,14 +84,6 @@ def date_header(date_str: str) -> str:
         return date_str
 
 
-def mask_key(key: str) -> str:
-    if not key:
-        return ""
-    if len(key) < 8:
-        return "•" * len(key)
-    return f"...{key[-4:]}"
-
-
 # dark theme layered on top of Quasar's defaults. the variables set the brand colors
 # and the per element rules clean up Quasar's default chrome to feel more like a
 # polished mobile app.
