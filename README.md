@@ -46,10 +46,25 @@ Download `Budget.zip` from the
 [Releases page](https://github.com/samensafi/budget-app/releases/latest), unzip
 it, and move `Budget` to your Applications folder.
 
-The first time, right-click the app, choose Open, then Open again (macOS shows
-this once for any app not from the App Store). On first launch it downloads what
-it needs and opens in your browser, a few minutes the first time and seconds
-after. It updates itself on each launch.
+The first time you open it, macOS warns that it cannot verify the app. This is
+expected for a free app that is not signed through Apple's paid program, and does
+not mean anything is wrong. To open it:
+
+1. Double-click Budget and dismiss the warning.
+2. Open System Settings, go to Privacy & Security, scroll down, and click "Open Anyway" next to the Budget message.
+3. Click Open to confirm. You only do this once.
+
+On older macOS, right-click Budget instead, choose Open, then Open again.
+
+In some cases macOS still keeps the app quarantined. If it will not open or the
+warning keeps returning, open the Terminal app, run this once, then try again:
+
+```
+xattr -dr com.apple.quarantine /Applications/Budget.app
+```
+
+On first launch Budget downloads what it needs and opens in your browser, a few
+minutes the first time and seconds after, and it updates itself on each launch.
 
 ### From source (developers)
 
