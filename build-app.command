@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds Budget.app, the double-click app with the icon, ready to upload to the GitHub
 # Releases page. It wraps budget-launcher.command (the single source of truth for how
-# Budget starts) and bakes in icon.png. Run this whenever the launcher changes, then
+# Budget starts) and bakes in docs/icon.png. Run this whenever the launcher changes, then
 # upload the fresh Budget.zip to a new release.
 #
 # Output, both next to this script and git-ignored (they belong on Releases, not in the
