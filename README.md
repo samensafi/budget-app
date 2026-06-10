@@ -66,7 +66,8 @@ xattr -dr com.apple.quarantine /Applications/Budget.app
 ```
 
 On first launch Budget downloads what it needs and opens in your browser, a few
-minutes the first time and seconds after, and it updates itself on each launch.
+minutes the first time and seconds after. After that it checks for updates each
+launch and asks before installing one.
 
 ### From source (developers)
 
@@ -82,9 +83,10 @@ http://localhost:8080. To stop it, close the tab and press Ctrl+C. Update with
 
 ## Updating
 
-The app updates itself on each launch and tells you when it has. You can also
-check from Settings under Updates. Updates only change the code, never your
-`userdata` folder, so your data stays exactly as it was.
+The app checks for updates on each launch. When one is available it shows a
+banner and asks before installing, so nothing changes until you choose to update.
+You can also check anytime from Settings under Updates. Updates only change the
+code, never your `userdata` folder, so your data stays exactly as it was.
 
 ## Where your data lives
 
