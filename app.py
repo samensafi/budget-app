@@ -1159,7 +1159,7 @@ def _render_home_inner():
 
     # action row: Add, Search, Sort and filter
     with ui.row().classes("w-full items-center gap-2").style("margin: 14px 0 6px;"):
-        ui.button("Add transaction (test 1)", icon="add",
+        ui.button("Add transaction (test 2)", icon="add",
                   on_click=open_add_dialog).props("color=primary unelevated")
         ui.button("Search", icon="search",
                   on_click=open_search_drawer).props("flat")
