@@ -155,3 +155,21 @@ def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str,
     if local == remote:
         return ("current", "Budget is up to date.")
     return ("available", "A new version of Budget is available.")
+
+
+def _banner_decision(*, reinstall_required: bool, reinstall_dismissed: bool,
+                     update_available: bool, update_dismissed: bool,
+                     offline: bool, offline_dismissed: bool) -> tuple[bool, bool, bool]:
+    # which of the three header banners to show. kept pure so every combination is unit-tested
+    # and the banners can never stand in for each other or get stuck. rules:
+    #  - reinstall (a launcher change git can't apply) is the most important; WHILE it's
+    #    required the in-app update banner is suppressed entirely, because the in-app update
+    #    can't change the launcher anyway, so reinstall is the real action. this holds even if
+    #    the reinstall banner itself was dismissed for the session.
+    #  - offline is an independent concern and may stack under either.
+    #  - each banner is hidden the moment its own dismissed flag is set.
+    # returns (show_reinstall, show_update, show_offline).
+    show_reinstall = reinstall_required and not reinstall_dismissed
+    show_update = update_available and not update_dismissed and not reinstall_required
+    show_offline = offline and not offline_dismissed
+    return (show_reinstall, show_update, show_offline)

@@ -54,6 +54,7 @@ from logic import (  # noqa: F401  re-exported for callers and tests
     _relative_time_ago,
     _expense_category_names,
     _update_state,
+    _banner_decision,
 )
 
 
@@ -757,11 +758,17 @@ def index():
             containers["settings"] = ui.column().classes("w-full")
             refresh_settings()
 
-    # the startup update check runs in the background (a network fetch), so refresh the
-    # banner shortly after load: if it has since found a newer version the Update available
-    # banner surfaces. it also rendered at build time above when the check was already done,
-    # and Settings -> Check for updates is the reliable on-demand path.
-    ui.timer(3.0, _refresh_banner, once=True)
+    # the startup update check runs in the background (a network fetch). poll briefly so the
+    # Update available banner surfaces as soon as it finishes, however long the fetch takes,
+    # then stop the moment it's done so it never refreshes forever. the reinstall and offline
+    # banners don't need this (they're synchronous), and Settings -> Check for updates is the
+    # reliable on-demand path.
+    _poll = {"timer": None}
+    def _poll_for_update():
+        _refresh_banner()
+        if _update_check_done and _poll["timer"] is not None:
+            _poll["timer"].active = False
+    _poll["timer"] = ui.timer(2.0, _poll_for_update)
 
 
 def _render_api_chip():
@@ -929,15 +936,22 @@ def _render_update_banner():
         close_btn.set_visibility(False)
         msg.set_text("Installing the update...")
         ok, m = await asyncio.to_thread(apply_update)
-        msg.set_text(m)
         if ok:
-            _update_available = False
-            title.set_text("Update installed")
-            icon.props("name=check_circle")
-            install_btn.set_visibility(False)
-        else:
-            install_btn.enable()
-            close_btn.set_visibility(True)
+            _update_available = False   # set first so a concurrent refresh can't re-show it
+        # the banner may have been re-rendered while the off-thread pull ran; updating now-
+        # detached elements is harmless, so guard it and never crash the click.
+        try:
+            msg.set_text(m)
+            if ok:
+                title.set_text("Update installed")
+                icon.props("name=check_circle")
+                install_btn.set_visibility(False)
+                close_btn.set_visibility(True)   # let the user dismiss the installed notice
+            else:
+                install_btn.enable()
+                close_btn.set_visibility(True)
+        except Exception:
+            pass
     install_btn.on_click(do_install)
 
 
@@ -958,12 +972,14 @@ def _refresh_banner():
     if _prev_api_online is True and not online:
         _set_offline_warning_dismissed(False)   # fresh offline episode, warn once more
     _prev_api_online = online
-    # reinstall is the most important and supersedes the update banner (a stale launcher means
-    # the in-app update can't fully apply anyway). offline is an independent concern and can
-    # stack under either.
-    show_reinstall = _reinstall_required() and not _reinstall_banner_dismissed
-    show_update = bool(_update_available) and not _update_banner_dismissed and not show_reinstall
-    show_offline = (not online) and not _offline_warning_dismissed()
+    show_reinstall, show_update, show_offline = _banner_decision(
+        reinstall_required=_reinstall_required(),
+        reinstall_dismissed=_reinstall_banner_dismissed,
+        update_available=bool(_update_available),
+        update_dismissed=_update_banner_dismissed,
+        offline=(not online),
+        offline_dismissed=_offline_warning_dismissed(),
+    )
     header_banner.clear()
     header_banner.set_visibility(show_reinstall or show_update or show_offline)
     if show_reinstall or show_update or show_offline:
@@ -3423,6 +3439,7 @@ def _render_categories_inner():
 _update_available = False   # set by the startup check + manual check; drives the banner + Settings hint
 _update_banner_dismissed = False   # session-only: user dismissed the update banner this run
 _reinstall_banner_dismissed = False   # session-only: user dismissed the reinstall banner this run
+_update_check_done = False   # the one-shot startup update check has finished (the banner can poll for it)
 
 
 def _git(*args: str, timeout: int = 30) -> tuple[bool, str]:
@@ -3486,14 +3503,17 @@ def _install_git_tools() -> None:
 
 
 def _startup_update_check() -> None:
-    # one quiet background check at launch so Settings can show an update is waiting and
-    # each browser tab gets a gentle heads-up. failures are swallowed, it's best-effort.
-    global _update_available
+    # one quiet background check at launch so the banner + Settings can show an update is
+    # waiting. failures are swallowed, it's best-effort. _update_check_done is set when it
+    # finishes (however long the fetch takes) so each tab's poll surfaces the banner then stops.
+    global _update_available, _update_check_done
     try:
         st, _ = check_for_update(do_fetch=True)
         _update_available = (st == "available")
     except Exception:
         _update_available = False
+    finally:
+        _update_check_done = True
 
 
 def _start_update_check() -> None:
