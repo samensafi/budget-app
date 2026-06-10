@@ -1,8 +1,6 @@
 # personal notes and local-only files, not part of the public app
-HANDOFF.md
 CLAUDE.md
 test_all.py
-pack-to-send.command
 
 # the built double-click app and its upload zip, made by build-app.command. these go on
 # the GitHub Releases page, never into the repo (the bundle holds its own launcher copy)
