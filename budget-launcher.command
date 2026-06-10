@@ -1,14 +1,12 @@
 #!/bin/bash
-# Budget launcher, source for the optional Automator app.
+# Budget launcher: the single source of truth for how Budget starts. build-app.command
+# copies this file verbatim into Budget.app (the double-click app on the GitHub Releases
+# page), so the launcher and the app can never drift apart.
 #
-# How to use: open Automator, choose New then Application, add a Run Shell Script
-# action (Shell: /bin/bash, Pass input: to stdin), paste the entire contents
-# of this file in, and save it as an app (e.g. Budget in /Applications).
-# That .app is what you double-click to use Budget.
-#
-# This file is the single source of truth for that launcher. If Budget's launch
-# contract changes (see app/CLAUDE.md, item 8), update this file and re-paste
-# it into Automator. Editing the .app does not update this file and vice versa.
+# If Budget's launch contract changes (port 8080, BUDGET_APP_MANAGED, run.command, the
+# app.py name, the app/+userdata/ layout; see app/CLAUDE.md), update this file, then
+# rebuild and re-upload the download: bash build-app.command, then upload the new
+# Budget.zip to a release. Editing the built .app does not update this file or vice versa.
 #
 # What it does: finds the app folder on its own (no hardcoded path); if Budget
 # isn't installed yet it offers to download it from GitHub; pulls the latest
@@ -257,6 +255,6 @@ while true; do
   fi
 done
 
-# 7. Final cleanup, then let the Automator app quit.
+# 7. Final cleanup, then let the launcher app quit.
 kill_app
 exit 0

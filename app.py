@@ -177,7 +177,7 @@ _migrate_legacy_layout()
 DB_PATH = str(USERDATA_DIR / "budget.db")
 BACKUP_DIR = USERDATA_DIR / "backups"
 
-# set to 1 by the optional Mac-app launcher (Automator) that wraps run.command.
+# set to 1 by Budget.app's launcher (budget-launcher.command) that wraps run.command.
 # when on, the only change is that the app does not auto-open a browser (the launcher
 # opens a fresh Safari window itself, and its watchdog fully stops this server the
 # moment that window/tab is closed, so nothing lingers in the background). a normal
@@ -258,14 +258,14 @@ def _no_touch_icon():
     return Response(status_code=204)
 
 
-# liveness probe for the Automator launcher's watchdog, must stay a plain route, never
+# liveness probe for Budget.app's launcher watchdog, must stay a plain route, never
 # the page. the launcher (budget-launcher.command) polls the server every ~2s to know
 # it's still alive. if that poll hits the page route, it re-runs the @ui.page builder,
 # which reassigns the module-level UI globals (containers/main_tabs/header_*) to a
 # throwaway request that never opens a WebSocket, orphaning the real browser tab so it
 # looks frozen (clicks reach the server and mutate the DB, but live updates land on the
 # dead client, and only a manual refresh re-claims the globals, until the next poll 2s
-# later). that exact bug is why the app froze only when launched via the Automator .app
+# later). that exact bug is why the app froze only when launched via Budget.app
 # and never via run.command, which has no watchdog. this endpoint gives the watchdog
 # something to hit that does not run index(). keep the launcher's server_up() pointed
 # here, not at the page route. (see CLAUDE.md item 8.)
