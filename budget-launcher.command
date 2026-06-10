@@ -9,8 +9,7 @@
 # Budget.zip to a release. Editing the built .app does not update this file or vice versa.
 #
 # What it does: finds the app folder on its own (no hardcoded path); if Budget
-# isn't installed yet it offers to download it from GitHub; pulls the latest
-# code on each launch so the app keeps itself updated; runs the server silently
+# isn't installed yet it offers to download it from GitHub; runs the server silently
 # in managed mode, sets itself up on first run, and shuts everything down the
 # moment the app's Safari tab/window is closed.
 
@@ -190,20 +189,11 @@ for pid in $port_pids; do
 done
 kill_app
 
-# 1. Keep Budget up to date. If this is a git copy and we are online, pull the
-#    latest code before starting. Never blocks startup, if it fails (offline, or
-#    no git) we just run the version already on disk. Updates only change code in
-#    app/, never the userdata/ folder, so your data is never touched.
-if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  before="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null)"
-  git -C "$APP_DIR" pull --ff-only >/dev/null 2>&1 || true
-  after="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null)"
-  if [ -n "$before" ] && [ -n "$after" ] && [ "$before" != "$after" ]; then
-    osascript -e 'display notification "Budget was updated to the latest version." with title "Budget"' >/dev/null 2>&1
-  fi
-fi
+# Budget no longer updates itself on launch. The app checks GitHub on its own and shows
+# an in-app banner with an Update now button when a new version is available, so updating
+# is the user's choice (see check_for_update / apply_update in app.py).
 
-# 2. First run? (no venv yet), allow a long, silent one-time setup and
+# 1. First run? (no venv yet), allow a long, silent one-time setup and
 #    tell the user it's working so the wait isn't a black hole.
 if [ -x "$VENV_PY" ]; then
   MAX=240          # ~120s: already set up, just starting.
@@ -212,12 +202,12 @@ else
   osascript -e 'display notification "Setting up Budget for the first time. This takes a few minutes and it will open by itself when ready." with title "Budget"' >/dev/null 2>&1
 fi
 
-# 3. Start the server silently in managed mode (no Terminal, no auto-open).
+# 2. Start the server silently in managed mode (no Terminal, no auto-open).
 export BUDGET_APP_MANAGED=1
 bash "$RUN" >/dev/null 2>&1 &
 RUN_PID=$!
 
-# 4. Wait for the server. Succeed when it answers, fail fast if the
+# 3. Wait for the server. Succeed when it answers, fail fast if the
 #    background process dies first (setup error), give up after MAX.
 tries=0
 until server_up; do
@@ -235,7 +225,7 @@ until server_up; do
   sleep 0.5
 done
 
-# 5. Open Budget in a new Safari window and bring Safari to the front.
+# 4. Open Budget in a new Safari window and bring Safari to the front.
 winID=$(osascript <<EOF 2>/dev/null
 tell application "Safari"
   activate
@@ -252,7 +242,7 @@ if [ -z "$winID" ]; then
   exit 1
 fi
 
-# 6. Watchdog, when the app's tab/window is gone (or the server dies), stop everything.
+# 5. Watchdog, when the app's tab/window is gone (or the server dies), stop everything.
 while true; do
   sleep 2
   if [ "$(app_open)" != "y" ]; then    # tab/window closed, or navigated away.
@@ -264,6 +254,6 @@ while true; do
   fi
 done
 
-# 7. Final cleanup, then let the launcher app quit.
+# 6. Final cleanup, then let the launcher app quit.
 kill_app
 exit 0

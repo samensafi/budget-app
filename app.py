@@ -737,11 +737,11 @@ def index():
             containers["settings"] = ui.column().classes("w-full")
             refresh_settings()
 
-    # if the startup check found a newer version on github, let this tab know once with a
-    # gentle pointer to Settings. fires just after load so it doesn't race the page build.
-    if _update_available:
-        ui.timer(1.0, lambda: ui.notify("An update is available. Open Settings to update Budget.",
-                                        type="info", timeout=6000), once=True)
+    # the startup update check runs in the background (a network fetch), so refresh the
+    # banner shortly after load: if it has since found a newer version the Update available
+    # banner surfaces. it also rendered at build time above when the check was already done,
+    # and Settings -> Check for updates is the reliable on-demand path.
+    ui.timer(3.0, _refresh_banner, once=True)
 
 
 def _render_api_chip():
@@ -836,16 +836,61 @@ def _render_status_banner():
             .tooltip("Dismiss")
 
 
+def _render_update_banner():
+    # a calm blue strip under the header announcing a ready in-app update. shown by
+    # _refresh_banner when the startup check or a manual Settings check finds a newer version
+    # on github and the user hasn't dismissed it. Update now installs it in place (a code-only
+    # git pull) then asks the user to quit and reopen, since the app does not hot-reload. the
+    # x dismisses it for this session (the next launch re-checks). the installing/installed
+    # states mutate this banner's own elements in place, never clearing the holder mid-click.
+    accent = "var(--bb-accent)"
+    with ui.row().classes("w-full items-center no-wrap").style(
+        "gap: 10px; margin: 2px 0 8px; padding: 9px 14px; border-radius: 10px; "
+        f"background: color-mix(in srgb, {accent} 12%, var(--bb-surface)); "
+        f"border: 1px solid color-mix(in srgb, {accent} 38%, var(--bb-border));"
+    ):
+        icon = ui.icon("system_update_alt").style(
+            f"font-size: 1.2rem; color: {accent}; flex-shrink: 0;")
+        with ui.column().style("gap: 1px; min-width: 0;").classes("flex-grow"):
+            title = ui.label("Update available").style(
+                f"font-weight: 700; font-size: 0.82rem; color: {accent};")
+            msg = ui.label("A new version of Budget is ready to install.") \
+                .classes("text-caption text-muted") \
+                .style("line-height: 1.3; white-space: normal;")
+        install_btn = ui.button("Update now", icon="download") \
+            .props("unelevated dense color=primary").style("flex-shrink: 0;")
+        close_btn = ui.button(icon="close", on_click=_dismiss_update_banner) \
+            .props("flat dense round").style("flex-shrink: 0; color: var(--bb-text-muted);") \
+            .tooltip("Dismiss")
+
+    async def do_install():
+        global _update_available
+        install_btn.disable()
+        close_btn.set_visibility(False)
+        msg.set_text("Installing the update...")
+        ok, m = await asyncio.to_thread(apply_update)
+        msg.set_text(m)
+        if ok:
+            _update_available = False
+            title.set_text("Update installed")
+            icon.props("name=check_circle")
+            install_btn.set_visibility(False)
+        else:
+            install_btn.enable()
+            close_btn.set_visibility(True)
+    install_btn.on_click(do_install)
+
+
 def _refresh_banner():
-    # show or hide the offline warning. it appears only when we're offline and the user
-    # hasn't already dismissed this offline episode. we also watch the online to offline
-    # edge here: the moment Claude goes from available to unavailable (green to yellow) we
-    # clear the saved dismissed flag so the warning surfaces once for the new episode.
-    # startup (prev is None) is never treated as that edge, so a previously dismissed
-    # warning can't pop back up just because the app restarted. lives in its own container,
-    # so this never disturbs the upload tab's in-progress UI. hiding uses set_visibility
-    # (display:none) so its padding leaves no gap, and clearing here never deletes a slot
-    # mid-click.
+    # show or hide the two header strips: the update banner (a newer version is available and
+    # not dismissed) and the offline warning (we're offline and the episode wasn't dismissed).
+    # both share the one fixed-position holder so whichever shows clears the header. we also
+    # watch the online to offline edge: the moment Claude goes from available to unavailable
+    # we clear the saved offline-dismissed flag so the warning surfaces once for the new
+    # episode. startup (prev is None) is never that edge, so a dismissed warning can't pop
+    # back up just from a restart. hiding uses set_visibility (display:none) so the padding
+    # leaves no gap. callers from inside a banner button defer this via a tiny timer so it
+    # never clears its own slot mid-click.
     global _prev_api_online
     if header_banner is None:
         return
@@ -853,23 +898,36 @@ def _refresh_banner():
     if _prev_api_online is True and not online:
         _set_offline_warning_dismissed(False)   # fresh offline episode, warn once more
     _prev_api_online = online
+    show_update = bool(_update_available) and not _update_banner_dismissed
+    show_offline = (not online) and not _offline_warning_dismissed()
     header_banner.clear()
-    show = (not online) and not _offline_warning_dismissed()
-    header_banner.set_visibility(show)
-    if show:
+    header_banner.set_visibility(show_update or show_offline)
+    if show_update or show_offline:
         with header_banner:
-            _render_status_banner()
+            if show_update:
+                _render_update_banner()
+            if show_offline:
+                _render_status_banner()
 
 
 def _dismiss_offline_banner():
     # hide the Working offline warning. the yellow Offline mode chip stays, so the user
     # still sees the app is offline, they've just acknowledged the heads-up. the choice is
     # saved, so it does not reappear after a restart, it surfaces again only the next time
-    # Claude goes from available to unavailable. this only toggles visibility (it never
-    # clears its own slot), so dismissing from a button inside the banner can't crash.
+    # Claude goes from available to unavailable. the re-render is deferred via a tiny timer
+    # so it never clears its own slot mid-click, and an update banner that's also showing
+    # stays put.
     _set_offline_warning_dismissed(True)
-    if header_banner is not None:
-        header_banner.set_visibility(False)
+    ui.timer(0.05, _refresh_banner, once=True)
+
+
+def _dismiss_update_banner():
+    # hide the update banner for this session (the next launch re-checks). deferred re-render
+    # for the same reason: never clear our own slot mid-click, and keep an offline banner that
+    # is also showing.
+    global _update_banner_dismissed
+    _update_banner_dismissed = True
+    ui.timer(0.05, _refresh_banner, once=True)
 
 
 def _offline_warning_dismissed() -> bool:
@@ -3287,7 +3345,8 @@ def _render_categories_inner():
 # changes nothing. all of this runs off the event loop (asyncio.to_thread / a daemon
 # thread) so the UI never blocks. _update_state in logic.py turns the raw facts into the
 # state the Settings panel shows, and is unit-tested without a real repo.
-_update_available = False   # set by the one-shot startup check; drives the Settings hint
+_update_available = False   # set by the startup check + manual check; drives the banner + Settings hint
+_update_banner_dismissed = False   # session-only: user dismissed the update banner this run
 
 
 def _git(*args: str, timeout: int = 30) -> tuple[bool, str]:
@@ -3748,6 +3807,7 @@ def _render_settings_inner():
         .classes("text-caption text-muted")
 
     async def do_check_update():
+        global _update_available, _update_banner_dismissed
         upd_check.disable()
         upd_install.set_visibility(False)
         upd_status.set_text("Checking for updates...")
@@ -3755,10 +3815,16 @@ def _render_settings_inner():
         if st == "no_git":
             await asyncio.to_thread(_install_git_tools)   # pop macOS's installer for them
         upd_status.set_text(msg)
-        upd_install.set_visibility(st == "available")
+        available = (st == "available")
+        upd_install.set_visibility(available)
+        _update_available = available
+        if available:
+            _update_banner_dismissed = False   # a fresh manual find re-shows the banner
+        _refresh_banner()                      # surface (or clear) the header update banner
         upd_check.enable()
 
     async def do_apply_update():
+        global _update_available
         upd_install.disable()
         upd_check.disable()
         upd_status.set_text("Installing the update...")
@@ -3767,6 +3833,8 @@ def _render_settings_inner():
         ui.notify(msg, type="positive" if ok else "warning", timeout=0 if ok else 4000)
         if ok:
             upd_install.set_visibility(False)
+            _update_available = False
+            _refresh_banner()               # clear the now-installed banner
         else:
             upd_install.enable()
         upd_check.enable()
