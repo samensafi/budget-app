@@ -204,6 +204,11 @@ fi
 
 # 2. Start the server silently in managed mode (no Terminal, no auto-open).
 export BUDGET_APP_MANAGED=1
+# Stamp this launcher's version so the app can tell when a launcher change needs the user to
+# reinstall Budget.app (the launcher lives inside the .app and git cannot update it). Bump this
+# AND REQUIRED_LAUNCHER_VERSION in app.py together, only for a launcher change that truly needs
+# a reinstall.
+export BUDGET_LAUNCHER_VERSION=1
 bash "$RUN" >/dev/null 2>&1 &
 RUN_PID=$!
 

@@ -184,6 +184,26 @@ BACKUP_DIR = USERDATA_DIR / "backups"
 # double-click of run.command leaves this off, so plain browser/dev use is unchanged.
 MANAGED_APP = bool(os.environ.get("BUDGET_APP_MANAGED"))
 
+# the launcher (budget-launcher.command, baked into Budget.app) stamps its own version into
+# BUDGET_LAUNCHER_VERSION. REQUIRED_LAUNCHER_VERSION is the lowest launcher this code works
+# with: when the running launcher is older, a launcher change shipped that git can't apply (the
+# launcher lives inside the .app), so the user must reinstall Budget.app. bump BOTH (here + the
+# launcher's export) together, only for a reinstall-worthy change.
+REQUIRED_LAUNCHER_VERSION = 1
+
+
+def _reinstall_required() -> bool:
+    # true ONLY when we can read a launcher version AND it's older than required. a missing or
+    # unreadable value (a dev run via run.command, an old copy that doesn't stamp one) returns
+    # False, so the reinstall banner can never appear by mistake.
+    raw = os.environ.get("BUDGET_LAUNCHER_VERSION")
+    if not raw:
+        return False
+    try:
+        return int(raw) < REQUIRED_LAUNCHER_VERSION
+    except (TypeError, ValueError):
+        return False
+
 
 # defensive monkey-patch: NiceGUI's Select._event_args_to_value crashes when Quasar
 # emits an int or raw value instead of the expected {value, label} dict. this wrapper
@@ -836,6 +856,46 @@ def _render_status_banner():
             .tooltip("Dismiss")
 
 
+def _open_releases_page():
+    # open the GitHub releases page in a new tab so the user can download the latest Budget.
+    # the running app stays open. any failure is swallowed, it's a convenience link.
+    try:
+        ui.run_javascript(
+            "window.open('https://github.com/samensafi/budget-app/releases/latest', '_blank')")
+    except Exception:
+        pass
+
+
+def _render_reinstall_banner():
+    # an amber strip under the header for the one case git can't fix: a launcher change that
+    # needs the user to reinstall Budget.app (see _reinstall_required). Download opens the
+    # GitHub releases page; the user downloads the latest and drags it into Applications, their
+    # data (in userdata/, outside the app) is untouched. the x dismisses it for this session
+    # only, it returns on the next launch because the reinstall still matters, until the new
+    # launcher stamps a current version and _reinstall_required() goes False on its own.
+    accent = "var(--bb-warning)"
+    with ui.row().classes("w-full items-center no-wrap").style(
+        "gap: 10px; margin: 2px 0 8px; padding: 9px 14px; border-radius: 10px; "
+        f"background: color-mix(in srgb, {accent} 12%, var(--bb-surface)); "
+        f"border: 1px solid color-mix(in srgb, {accent} 38%, var(--bb-border));"
+    ):
+        ui.icon("system_update_alt").style(
+            f"font-size: 1.2rem; color: {accent}; flex-shrink: 0;")
+        with ui.column().style("gap: 1px; min-width: 0;").classes("flex-grow"):
+            ui.label("Reinstall required").style(
+                f"font-weight: 700; font-size: 0.82rem; color: {accent};")
+            ui.label("This version of Budget needs to be replaced. Download the latest from "
+                     "GitHub and drag it into your Applications folder. Your data is safe and "
+                     "stays on your Mac.") \
+                .classes("text-caption text-muted") \
+                .style("line-height: 1.3; white-space: normal;")
+        ui.button("Download", icon="download", on_click=_open_releases_page) \
+            .props("unelevated dense color=warning text-color=dark").style("flex-shrink: 0;")
+        ui.button(icon="close", on_click=_dismiss_reinstall_banner) \
+            .props("flat dense round").style("flex-shrink: 0; color: var(--bb-text-muted);") \
+            .tooltip("Dismiss")
+
+
 def _render_update_banner():
     # a calm blue strip under the header announcing a ready in-app update. shown by
     # _refresh_banner when the startup check or a manual Settings check finds a newer version
@@ -898,13 +958,19 @@ def _refresh_banner():
     if _prev_api_online is True and not online:
         _set_offline_warning_dismissed(False)   # fresh offline episode, warn once more
     _prev_api_online = online
-    show_update = bool(_update_available) and not _update_banner_dismissed
+    # reinstall is the most important and supersedes the update banner (a stale launcher means
+    # the in-app update can't fully apply anyway). offline is an independent concern and can
+    # stack under either.
+    show_reinstall = _reinstall_required() and not _reinstall_banner_dismissed
+    show_update = bool(_update_available) and not _update_banner_dismissed and not show_reinstall
     show_offline = (not online) and not _offline_warning_dismissed()
     header_banner.clear()
-    header_banner.set_visibility(show_update or show_offline)
-    if show_update or show_offline:
+    header_banner.set_visibility(show_reinstall or show_update or show_offline)
+    if show_reinstall or show_update or show_offline:
         with header_banner:
-            if show_update:
+            if show_reinstall:
+                _render_reinstall_banner()
+            elif show_update:
                 _render_update_banner()
             if show_offline:
                 _render_status_banner()
@@ -927,6 +993,15 @@ def _dismiss_update_banner():
     # is also showing.
     global _update_banner_dismissed
     _update_banner_dismissed = True
+    ui.timer(0.05, _refresh_banner, once=True)
+
+
+def _dismiss_reinstall_banner():
+    # hide the reinstall banner for THIS session only. it deliberately returns on the next
+    # launch (the reinstall still needs doing) until a current launcher version clears it. the
+    # re-render is deferred so it never clears its own slot mid-click and keeps other banners.
+    global _reinstall_banner_dismissed
+    _reinstall_banner_dismissed = True
     ui.timer(0.05, _refresh_banner, once=True)
 
 
@@ -3347,6 +3422,7 @@ def _render_categories_inner():
 # state the Settings panel shows, and is unit-tested without a real repo.
 _update_available = False   # set by the startup check + manual check; drives the banner + Settings hint
 _update_banner_dismissed = False   # session-only: user dismissed the update banner this run
+_reinstall_banner_dismissed = False   # session-only: user dismissed the reinstall banner this run
 
 
 def _git(*args: str, timeout: int = 30) -> tuple[bool, str]:
