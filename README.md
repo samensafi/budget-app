@@ -1,6 +1,6 @@
 # Budget
 
-[![Download Budget](https://img.shields.io/badge/Download-Budget.zip-2ea44f?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/samensafi/budget-app/releases/latest/download/Budget.zip)
+[![Download](https://img.shields.io/badge/Download-2ea44f?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/samensafi/budget-app/releases/latest/download/Budget.zip)
 
 ![Latest release](https://img.shields.io/github/v/release/samensafi/budget-app?label=release) ![Platform](https://img.shields.io/badge/platform-macOS-555) ![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange)
 
