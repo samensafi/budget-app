@@ -178,7 +178,16 @@ kill_app() {
 
 trap 'kill_app; exit 0' INT TERM
 
-# 0. Kill any older / leftover copy first.
+# 0. Free port 8080 so Budget can always start, killing whatever holds it. If the holder
+#    is something OTHER than a leftover Budget, let the user know we're clearing it first.
+port_pids=$(lsof -tiTCP:$PORT -sTCP:LISTEN 2>/dev/null)
+for pid in $port_pids; do
+  cmd=$(ps -p "$pid" -o command= 2>/dev/null)
+  [ -z "$cmd" ] && continue                  # process already gone
+  case "$cmd" in *app.py*) continue ;; esac  # our own leftover, no warning needed
+  osascript -e 'display notification "Another app was using port 8080. Budget freed it so it can start." with title "Budget"' >/dev/null 2>&1
+  break
+done
 kill_app
 
 # 1. Keep Budget up to date. If this is a git copy and we are online, pull the
