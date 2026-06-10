@@ -136,10 +136,16 @@ def _expense_category_names(all_names: list[str]) -> list[str]:
     return [c for c in all_names if c not in ("Income", "Other")]
 
 
-def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str) -> tuple[str, str]:
+def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str,
+                  git_installed: bool = True) -> tuple[str, str]:
     # turn raw git facts into what the Updates panel should show. pure so it tests without
-    # a real repo. states: not_git (copy has no git, can't self-update), unknown (couldn't
-    # reach github or read the commits), current (already newest), available (github ahead).
+    # a real repo. states: no_git (git itself isn't installed), not_git (this copy isn't a
+    # git checkout), unknown (couldn't reach github or read the commits), current (already
+    # newest), available (github ahead).
+    if not git_installed:
+        return ("no_git", "Budget needs Git to check for updates and it isn't installed. "
+                          "A macOS install window should open, click Install, wait for it "
+                          "to finish, then open Budget again.")
     if not is_repo:
         return ("not_git", "This copy was not installed with Git, so it can't update "
                            "itself. Re-download Budget to get the latest version.")

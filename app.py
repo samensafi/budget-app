@@ -3306,9 +3306,19 @@ def _is_git_checkout() -> bool:
     return ok and out == "true"
 
 
+def _git_usable() -> bool:
+    # is a working git actually available? a plain `git --version` fails both when the
+    # binary is missing and when only macOS's /usr/bin/git stub is present without the
+    # Command Line Tools, so this tells "git not installed" apart from "not a git checkout".
+    ok, _ = _git("--version")
+    return ok
+
+
 def check_for_update(do_fetch: bool = True) -> tuple[str, str]:
     # compare the local commit with what's on github. returns (state, message) from
     # logic._update_state. fetch first so the comparison sees the latest remote.
+    if not _git_usable():
+        return _update_state(False, False, "", "", git_installed=False)
     if not _is_git_checkout():
         return _update_state(False, False, "", "")
     fetch_ok = True
@@ -3328,6 +3338,16 @@ def apply_update() -> tuple[bool, str]:
     if ok:
         return (True, "Update installed. Quit Budget and open it again to finish.")
     return (False, "Couldn't install the update. Check your internet connection and try again.")
+
+
+def _install_git_tools() -> None:
+    # best-effort: ask macOS to install the Command Line Tools (which include git), the
+    # same prompt the launcher uses on a git-less Mac. harmless if they're already there
+    # or mid-install. fired from the Updates panel when git turns out not to be usable.
+    try:
+        subprocess.run(["xcode-select", "--install"], capture_output=True, timeout=15)
+    except Exception:
+        pass
 
 
 def _startup_update_check() -> None:
@@ -3732,6 +3752,8 @@ def _render_settings_inner():
         upd_install.set_visibility(False)
         upd_status.set_text("Checking for updates...")
         st, msg = await asyncio.to_thread(check_for_update, True)
+        if st == "no_git":
+            await asyncio.to_thread(_install_git_tools)   # pop macOS's installer for them
         upd_status.set_text(msg)
         upd_install.set_visibility(st == "available")
         upd_check.enable()
