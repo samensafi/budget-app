@@ -1,5 +1,7 @@
 # Budget
 
+![Latest release](https://img.shields.io/github/v/release/samensafi/budget-app?label=release) ![Platform](https://img.shields.io/badge/platform-macOS-555) ![Python](https://img.shields.io/badge/python-3.11-blue) ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange)
+
 A budget tracker that runs on your own Mac. Your data stays on your
 computer in a single SQLite file, and the app opens in your web browser.
 
