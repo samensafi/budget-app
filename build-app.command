@@ -4,8 +4,8 @@
 # Budget starts) and bakes in icon.png. Run this whenever the launcher changes, then
 # upload the fresh Budget.zip to a new release.
 #
-# Output, both next to this script and both git-ignored (they belong on Releases, not in
-# the repo): Budget.app (the app) and Budget.zip (the same app zipped for uploading).
+# Output, both next to this script and git-ignored (they belong on Releases, not in the
+# repo): Budget.app (the app) and Budget.zip (the same app zipped for uploading).
 #
 # This only packages files. It never starts the app, so it is safe to run.
 
