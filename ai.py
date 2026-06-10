@@ -1,4 +1,4 @@
-# Claude integration for extracting and categorizing transactions from statements
+# Claude integration that extracts and categorizes transactions from statements
 from __future__ import annotations
 
 import base64
