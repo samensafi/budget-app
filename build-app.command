@@ -15,7 +15,7 @@ HERE="$PWD"
 APP="$HERE/Budget.app"
 ZIP="$HERE/Budget.zip"
 LAUNCHER="$HERE/budget-launcher.command"
-ICON_SRC="$HERE/icon.png"
+ICON_SRC="$HERE/docs/icon.png"
 
 if [ ! -f "$LAUNCHER" ]; then
   echo "budget-launcher.command not found next to this script."

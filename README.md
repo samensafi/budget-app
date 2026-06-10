@@ -11,12 +11,12 @@ Anthropic API key. Everything else works without one.
 
 ## A look inside
 
-![Home](docs/screenshots/home.png)
+![Home](docs/home.png)
 
 | | |
 | :--: | :--: |
-| ![Insights](docs/screenshots/insights.png) | ![Insights detail](docs/screenshots/insights-detail.png) |
-| ![Upload](docs/screenshots/upload.png) | ![Categories](docs/screenshots/categories.png) |
+| ![Insights](docs/insights.png) | ![Insights detail](docs/insights-detail.png) |
+| ![Upload](docs/upload.png) | ![Categories](docs/categories.png) |
 
 ## What it does
 
