@@ -9,7 +9,7 @@ Type income and expenses in by hand, or upload a receipt or statement and have
 the transactions pulled out for you. Reading uploads uses Claude and needs an
 Anthropic API key. Everything else works without one.
 
-## Screenshots
+## A look inside
 
 ![Home](docs/screenshots/home.png)
 
@@ -22,7 +22,7 @@ Anthropic API key. Everything else works without one.
 
 - Track income and expenses by category
 - Upload a receipt or statement (PDF, PNG, JPG, TXT) and extract its transactions
-- See where your money goes with monthly charts and a category breakdown
+- See where your money goes with monthly and yearly charts and a category breakdown
 - Search and edit past transactions
 - Remember a store's category so it fills in next time
 - Export to CSV or Excel
@@ -80,3 +80,8 @@ locally in your own database file.
 ## Built with
 
 NiceGUI, SQLite, pandas, Plotly and the Anthropic API.
+
+## License
+
+Budget is released under the PolyForm Noncommercial License 1.0.0, free to use
+and modify for noncommercial purposes. See [LICENSE](LICENSE) for the full terms.
