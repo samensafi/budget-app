@@ -14,21 +14,21 @@ MONTH_NAMES = [
 
 
 def amount_str(amount: float, *, grouped: bool = True) -> str:
-    # magnitude of amount as a display string. whole dollars drop the cents so 4 stays
-    # 4, while 4.33 and 4.50 keep the two decimals. grouped adds thousands separators,
-    # pass grouped=False for an editable input value with no commas so it still parses
-    # as a float. rounds to 2dp first so float noise like 4.000000001 still reads whole.
-    a = abs(amount)
-    whole = round(a, 2) == int(round(a, 2))
-    if grouped:
-        return f"{int(round(a)):,}" if whole else f"{a:,.2f}"
-    return f"{int(round(a))}" if whole else f"{a:.2f}"
+    # magnitude of amount as a display string with trailing-zero cents dropped: 4 stays 4,
+    # 174.50 shows as 174.5, and 174.55 keeps both digits. grouped adds thousands separators,
+    # pass grouped=False for an editable input value with no commas so it still parses as a
+    # float. rounds to 2dp first so float noise like 4.000000001 still reads whole.
+    a = round(abs(amount), 2)
+    s = f"{a:,.2f}" if grouped else f"{a:.2f}"
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
 
 
 def money(amount: float, *, signed: bool = False, rounded: bool = False) -> str:
     # rounded rounds to the nearest whole dollar for the home summary cards and
-    # Insights. default keeps the cents but drops a trailing .00 on whole dollars so
-    # $4 stays $4, while $4.33 keeps the cents (via amount_str).
+    # Insights. default keeps the cents but drops trailing zeros so $4 stays $4,
+    # $174.50 shows as $174.5, and $4.33 keeps both digits (via amount_str).
     body = f"{abs(amount):,.0f}" if rounded else amount_str(amount)
     if signed:
         if amount > 0:
