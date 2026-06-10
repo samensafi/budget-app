@@ -1,6 +1,6 @@
 # Budget
 
-A small budget tracker that runs on your own Mac. Your data stays on your
+A budget tracker that runs on your own Mac. Your data stays on your
 computer in a single SQLite file, and the app opens in your web browser.
 
 Type income and expenses in by hand, or upload a receipt or statement and have
