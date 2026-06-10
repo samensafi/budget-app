@@ -9,6 +9,15 @@ Type income and expenses in by hand, or upload a receipt or statement and have
 the transactions pulled out for you. Reading uploads uses Claude and needs an
 Anthropic API key. Everything else works without one.
 
+## Screenshots
+
+![Home](docs/screenshots/home.png)
+
+| | |
+| :--: | :--: |
+| ![Insights](docs/screenshots/insights.png) | ![Insights detail](docs/screenshots/insights-detail.png) |
+| ![Upload](docs/screenshots/upload.png) | ![Categories](docs/screenshots/categories.png) |
+
 ## What it does
 
 - Track income and expenses by category
