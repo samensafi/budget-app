@@ -38,8 +38,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Budget</string>
   <key>CFBundleDisplayName</key><string>Budget</string>
   <key>CFBundleIdentifier</key><string>com.samensafi.budget</string>
-  <key>CFBundleVersion</key><string>1.2</string>
-  <key>CFBundleShortVersionString</key><string>1.2</string>
+  <key>CFBundleVersion</key><string>1.3</string>
+  <key>CFBundleShortVersionString</key><string>1.3</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>Budget</string>
   <key>CFBundleIconFile</key><string>icon</string>
