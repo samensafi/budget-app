@@ -3690,6 +3690,89 @@ def _render_settings_inner():
     with ui.row().classes("gap-2").style("margin-top: 6px;"):
         ui.button("Adjust estimate", icon="edit", on_click=open_adjust_estimate).props("flat dense")
         ui.button("Reset estimate", icon="restart_alt", on_click=reset_usage).props("flat dense")
+    # updates. checks github for a newer version and installs it on click. the check and
+    # the pull run off the event loop so the panel never freezes. a copy without git just
+    # gets told it can't self-update. the startup check may have already flagged one, in
+    # which case the Update now button is shown straight away.
+    ui.separator().style("margin: 18px 0;")
+    ui.label("Updates").classes("text-h6")
+    upd_status = ui.label("Check whether a newer version of Budget is available.") \
+        .classes("text-caption text-muted")
+
+    async def do_check_update():
+        global _update_available, _update_banner_dismissed
+        upd_check.disable()
+        upd_install.set_visibility(False)
+        upd_status.set_text("Checking for updates...")
+        st, msg = await asyncio.to_thread(check_for_update, True)
+        if st == "no_git":
+            await asyncio.to_thread(_install_git_tools)   # pop macOS's installer for them
+        upd_status.set_text(msg)
+        available = (st == "available")
+        upd_install.set_visibility(available)
+        _update_available = available
+        if available:
+            _update_banner_dismissed = False   # a fresh manual find re-shows the banner
+        _refresh_banner()                      # surface (or clear) the header update banner
+        upd_check.enable()
+
+    async def do_apply_update():
+        global _update_available
+        upd_install.disable()
+        upd_check.disable()
+        upd_status.set_text("Installing the update...")
+        ok, msg = await asyncio.to_thread(apply_update)
+        upd_status.set_text(msg)
+        ui.notify(msg, type="positive" if ok else "warning", timeout=0 if ok else 4000)
+        if ok:
+            upd_install.set_visibility(False)
+            _update_available = False
+            _refresh_banner()               # clear the now-installed banner
+        else:
+            upd_install.enable()
+        upd_check.enable()
+
+    with ui.row().classes("gap-2 items-center").style("margin-top: 8px;"):
+        upd_check = ui.button("Check for updates", icon="refresh", on_click=do_check_update) \
+            .props("outline dense")
+        upd_install = ui.button("Update now", icon="download", on_click=do_apply_update) \
+            .props("unelevated dense color=primary")
+    upd_install.set_visibility(False)
+    if _update_available:
+        upd_status.set_text("A new version of Budget is available.")
+        upd_install.set_visibility(True)
+
+    # Auto-backups run after every change. The refresh button forces a fresh one now.
+    ui.separator().style("margin: 18px 0;")
+
+    def backup_now():
+        if _make_backup(force=True):
+            ui.notify("Backup saved.", type="positive")
+            refresh_settings()
+        else:
+            ui.notify("Couldn't save a backup.", type="negative")
+
+    with ui.row().classes("items-center no-wrap").style("gap: 8px;"):
+        ui.label("Backups").classes("text-h6")
+        ui.button(icon="refresh", on_click=backup_now) \
+          .props("flat round dense color=primary").tooltip("Back up now")
+
+    snaps = sorted(BACKUP_DIR.glob("budget_*.db"),
+                   key=lambda p: p.stat().st_mtime, reverse=True) if BACKUP_DIR.exists() else []
+    if snaps:
+        when = datetime.fromtimestamp(snaps[0].stat().st_mtime).strftime("%b %d, %Y at %H:%M")
+        ui.label(f"Last backup: {when}.") \
+          .classes("text-caption text-muted")
+        ui.label("A full snapshot of all your data (transactions, categories, learned "
+                 f"stores and your API key) is saved automatically to {BACKUP_DIR} "
+                 "after every change.") \
+          .classes("text-caption text-muted")
+    else:
+        ui.label("No backup yet. A full snapshot of all your data (transactions, "
+                 "categories, learned stores and your API key) is saved automatically to "
+                 f"{BACKUP_DIR} after every change.") \
+          .classes("text-caption text-muted")
+
     ui.separator().style("margin: 18px 0;")
     ui.label("Export").classes("text-h6")
     all_txns = db.get_transactions(DB_PATH)
@@ -3759,37 +3842,6 @@ def _render_settings_inner():
                 ui.button("Transactions to Excel", icon="file_download",
                           on_click=lambda: export("xlsx")) \
                   .props("flat").classes("flex-grow")
-
-    # Auto-backups run after every change. The refresh button forces a fresh one now.
-    ui.separator().style("margin: 18px 0;")
-
-    def backup_now():
-        if _make_backup(force=True):
-            ui.notify("Backup saved.", type="positive")
-            refresh_settings()
-        else:
-            ui.notify("Couldn't save a backup.", type="negative")
-
-    with ui.row().classes("items-center no-wrap").style("gap: 8px;"):
-        ui.label("Backups").classes("text-h6")
-        ui.button(icon="refresh", on_click=backup_now) \
-          .props("flat round dense color=primary").tooltip("Back up now")
-
-    snaps = sorted(BACKUP_DIR.glob("budget_*.db"),
-                   key=lambda p: p.stat().st_mtime, reverse=True) if BACKUP_DIR.exists() else []
-    if snaps:
-        when = datetime.fromtimestamp(snaps[0].stat().st_mtime).strftime("%b %d, %Y at %H:%M")
-        ui.label(f"Last backup: {when}.") \
-          .classes("text-caption text-muted")
-        ui.label("A full snapshot of all your data (transactions, categories, learned "
-                 f"stores and your API key) is saved automatically to {BACKUP_DIR} "
-                 "after every change.") \
-          .classes("text-caption text-muted")
-    else:
-        ui.label("No backup yet. A full snapshot of all your data (transactions, "
-                 "categories, learned stores and your API key) is saved automatically to "
-                 f"{BACKUP_DIR} after every change.") \
-          .classes("text-caption text-muted")
 
     # recently deleted (recovery)
     # tucked behind a button so Settings stays short, the list opens in a dialog.
@@ -3892,58 +3944,6 @@ def _render_settings_inner():
         .props("outline dense").style("margin-top: 10px;")
     if n_deleted == 0:
         view_btn.disable()
-
-    # updates. checks github for a newer version and installs it on click. the check and
-    # the pull run off the event loop so the panel never freezes. a copy without git just
-    # gets told it can't self-update. the startup check may have already flagged one, in
-    # which case the Update now button is shown straight away.
-    ui.separator().style("margin: 18px 0;")
-    ui.label("Updates").classes("text-h6")
-    upd_status = ui.label("Check whether a newer version of Budget is available.") \
-        .classes("text-caption text-muted")
-
-    async def do_check_update():
-        global _update_available, _update_banner_dismissed
-        upd_check.disable()
-        upd_install.set_visibility(False)
-        upd_status.set_text("Checking for updates...")
-        st, msg = await asyncio.to_thread(check_for_update, True)
-        if st == "no_git":
-            await asyncio.to_thread(_install_git_tools)   # pop macOS's installer for them
-        upd_status.set_text(msg)
-        available = (st == "available")
-        upd_install.set_visibility(available)
-        _update_available = available
-        if available:
-            _update_banner_dismissed = False   # a fresh manual find re-shows the banner
-        _refresh_banner()                      # surface (or clear) the header update banner
-        upd_check.enable()
-
-    async def do_apply_update():
-        global _update_available
-        upd_install.disable()
-        upd_check.disable()
-        upd_status.set_text("Installing the update...")
-        ok, msg = await asyncio.to_thread(apply_update)
-        upd_status.set_text(msg)
-        ui.notify(msg, type="positive" if ok else "warning", timeout=0 if ok else 4000)
-        if ok:
-            upd_install.set_visibility(False)
-            _update_available = False
-            _refresh_banner()               # clear the now-installed banner
-        else:
-            upd_install.enable()
-        upd_check.enable()
-
-    with ui.row().classes("gap-2 items-center").style("margin-top: 8px;"):
-        upd_check = ui.button("Check for updates", icon="refresh", on_click=do_check_update) \
-            .props("outline dense")
-        upd_install = ui.button("Update now", icon="download", on_click=do_apply_update) \
-            .props("unelevated dense color=primary")
-    upd_install.set_visibility(False)
-    if _update_available:
-        upd_status.set_text("A new version of Budget is available.")
-        upd_install.set_visibility(True)
 
     ui.separator().style("margin: 18px 0;")
     ui.label("Danger zone").classes("text-h6").style("color: var(--bb-expense);")
