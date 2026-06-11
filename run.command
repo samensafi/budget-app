@@ -34,6 +34,14 @@ VENV="$DATA/venv"
 PYBIN="$VENV/bin/python"
 STAMP="$VENV/.requirements.sha"
 
+# a damaged environment (an interrupted first setup, a full disk) would otherwise fail
+# the exact same way on every launch, forever. if its python can't even start, wipe the
+# environment so the normal setup below rebuilds it from scratch. it holds no user data.
+if [ -e "$VENV" ] && ! "$PYBIN" -c "" >/dev/null 2>&1; then
+  echo "Budget's environment looks damaged. Rebuilding it (a few minutes)..."
+  rm -rf "$VENV"
+fi
+
 # 1. Find uv, the tool that builds Budget's private environment. It pins the
 #    exact Python version Budget needs (see .python-version), downloading it if
 #    this Mac doesn't have it, so the app behaves the same everywhere. Install
