@@ -2794,8 +2794,11 @@ def _render_upload_inner():
         # Review) using the user's learned library. never touches a confident AI row, so
         # it can't add false positives, it just means more rows arrive pre-categorized as
         # the library grows, which is the whole point of leaning on learning over time.
+        # threaded like the AI calls: on a grown library a big statement costs ~1s,
+        # which would otherwise stall the event loop.
         if all_extracted:
-            _apply_learned_rescue(all_extracted, db.get_merchant_memory(DB_PATH), cs)
+            await asyncio.to_thread(
+                _apply_learned_rescue, all_extracted, db.get_merchant_memory(DB_PATH), cs)
 
         state.extracted_preview = all_extracted
         state.preview_categories = {i: t["category"] for i, t in enumerate(all_extracted)}
