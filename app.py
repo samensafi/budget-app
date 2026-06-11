@@ -4099,6 +4099,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     try:
         ui.run(
             port=8080,
+            host="127.0.0.1",   # this Mac only, never visible to other devices on the network
             title="Budget",
             favicon="💲",
             dark=True,
