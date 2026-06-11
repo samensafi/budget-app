@@ -61,6 +61,16 @@ def prune_data_exports(export_dir: Path, *, keep: int) -> None:
                 pass
 
 
+def text_only_cells(ws) -> None:
+    # openpyxl stores any string starting with = as a live formula. these files hold
+    # data, never formulas, so flip such cells back to plain text. without this a name
+    # like =QUICKMART reads back empty and Excel would try to run it as a formula.
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.data_type == "f" and isinstance(cell.value, str):
+                cell.data_type = "s"
+
+
 def startup_data_backup(db_path: str, export_dir: Path, *, keep: int) -> None:
     # on launch, write a readable copy of every transaction to export_dir as both a
     # transactions_<ts>.csv and .xlsx, then trim to the newest few. does nothing when
@@ -76,6 +86,7 @@ def startup_data_backup(db_path: str, export_dir: Path, *, keep: int) -> None:
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Transactions", index=False)
+            text_only_cells(writer.book["Transactions"])
         (export_dir / f"transactions_{ts}.xlsx").write_bytes(buf.getvalue())
         prune_data_exports(export_dir, keep=keep)
     except Exception as e:

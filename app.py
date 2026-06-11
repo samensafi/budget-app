@@ -3834,6 +3834,7 @@ def _render_settings_inner():
                     buf = io.BytesIO()
                     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
                         df_x.to_excel(writer, sheet_name="Transactions", index=False)
+                        backup.text_only_cells(writer.book["Transactions"])
                     ui.download.content(buf.getvalue(), f"transactions_{tag}_{stamp}.xlsx")
 
             with ui.row().classes("gap-2 w-full"):
