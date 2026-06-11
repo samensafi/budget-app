@@ -712,8 +712,12 @@ def get_transactions(
         sql += f" AND category IN ({','.join('?'*len(categories))})"
         params.extend(categories)
     if merchant_search:
-        sql += " AND lower(merchant) LIKE ?"
-        params.append(f"%{merchant_search.lower()}%")
+        # escape LIKE wildcards so a search for "100%" or "a_b" matches those
+        # literally instead of treating % and _ as match-anything. backslash first.
+        term = (merchant_search.lower()
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"))
+        sql += " AND lower(merchant) LIKE ? ESCAPE '\\'"
+        params.append(f"%{term}%")
     if needs_review_only:
         sql += " AND needs_review=1"
     if flagged_only:
