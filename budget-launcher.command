@@ -170,8 +170,11 @@ URL="http://$HOST:$PORT/?app=$(date +%s)"   # ?app=... defeats Safari's cache
 # page, so polling it can never freeze the app. See app.py (_healthz) and CLAUDE.md item 8.
 server_up() { curl -s -o /dev/null --max-time 2 "http://$HOST:$PORT/healthz"; }
 
-# returns y if any Safari tab still points at the app, else n (or empty if Safari quit).
+# returns y if any Safari tab still points at the app, else n. Bail out before the
+# AppleScript when Safari isn't running at all: asking a closed app about its windows
+# silently relaunches it, so quitting Safari would make it pop right back open.
 app_open() {
+  if ! pgrep -xq Safari; then echo "n"; return; fi
   osascript 2>/dev/null <<EOF
 tell application "Safari"
   set found to "n"
