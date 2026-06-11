@@ -38,8 +38,13 @@ STAMP="$VENV/.requirements.sha"
 # the exact same way on every launch, forever. if its python can't even start, wipe the
 # environment so the normal setup below rebuilds it from scratch. it holds no user data.
 if [ -e "$VENV" ] && ! "$PYBIN" -c "" >/dev/null 2>&1; then
-  echo "Budget's environment looks damaged. Rebuilding it (a few minutes)..."
-  rm -rf "$VENV"
+  # double-check a second later so a momentary glitch never triggers a rebuild,
+  # a truly broken environment fails both times
+  sleep 1
+  if ! "$PYBIN" -c "" >/dev/null 2>&1; then
+    echo "Budget's environment looks damaged. Rebuilding it (a few minutes)..."
+    rm -rf "$VENV"
+  fi
 fi
 
 # 1. Find uv, the tool that builds Budget's private environment. It pins the
