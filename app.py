@@ -1147,12 +1147,18 @@ def _render_home_inner():
 
     # KPI cards (3-wide). Balance is green when >= 0, red when negative. Color follows
     # the rounded number on the card, so float drift can never paint a red $0.
-    balance_cls = "income" if round(summary["net"]) >= 0 else "expense"
+    # Balance is derived from the two rounded cards, not from the exact net, so the
+    # subtraction a reader does on screen always checks out (806 - 281 shows 525,
+    # even when the exact net rounds to 524).
+    inc_r = round(summary["income"])
+    exp_r = round(summary["expenses"])
+    bal_r = inc_r - exp_r
+    balance_cls = "income" if bal_r >= 0 else "expense"
     with ui.row().classes("w-full gap-3 no-wrap").style("margin-top: 12px;"):
         for label, value, cls in [
-            ("Income",   bb.money(summary["income"], rounded=True),   "income"),
-            ("Expenses", bb.money(summary["expenses"], rounded=True), "expense"),
-            ("Balance",  bb.money(summary["net"], signed=True, rounded=True), balance_cls),
+            ("Income",   bb.money(inc_r, rounded=True),   "income"),
+            ("Expenses", bb.money(exp_r, rounded=True), "expense"),
+            ("Balance",  bb.money(bal_r, signed=True, rounded=True), balance_cls),
         ]:
             with ui.card().classes("bb-kpi flex-grow"):
                 ui.label(label).classes("kpi-label")
@@ -2244,14 +2250,17 @@ def _render_insights_inner():
     df["date"] = pd.to_datetime(df["date"])
     income = float(df.loc[df["amount"] > 0, "amount"].sum())
     expenses = float(-df.loc[df["amount"] < 0, "amount"].sum())
-    net = income - expenses
 
-    balance_cls = "income" if round(net) >= 0 else "expense"  # same drift guard as Home
+    # balance comes from the two rounded cards so the on-screen math adds up, like Home
+    inc_r = round(income)
+    exp_r = round(expenses)
+    bal_r = inc_r - exp_r
+    balance_cls = "income" if bal_r >= 0 else "expense"
     with ui.row().classes("w-full gap-3 no-wrap").style("margin-top: 10px;"):
         for label, value, cls in [
-            ("Income",   bb.money(income, rounded=True),   "income"),
-            ("Expenses", bb.money(expenses, rounded=True), "expense"),
-            ("Balance",  bb.money(net, signed=True, rounded=True), balance_cls),
+            ("Income",   bb.money(inc_r, rounded=True),   "income"),
+            ("Expenses", bb.money(exp_r, rounded=True), "expense"),
+            ("Balance",  bb.money(bal_r, signed=True, rounded=True), balance_cls),
         ]:
             with ui.card().classes("bb-kpi flex-grow"):
                 ui.label(label).classes("kpi-label")
