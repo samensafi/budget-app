@@ -49,8 +49,9 @@ else
   UV="$HOME/.local/bin/uv"
   if [ ! -x "$UV" ]; then
     echo ""
-    echo "Could not set up Budget's helper tool. Check your internet connection and run this again."
-    read -n 1 -s -r -p "Press any key to close this window."
+    echo "Could not set up Budget's helper tool. Check your internet connection and try again."
+    # only wait for a key when a person is actually at a terminal
+    [ -t 0 ] && read -n 1 -s -r -p "Press any key to close this window."
     exit 1
   fi
 fi
@@ -60,8 +61,8 @@ fi
 if [ ! -x "$PYBIN" ]; then
   echo "Setting up Budget for the first time. This takes a few minutes..."
   if ! "$UV" venv "$VENV" --python 3.11 >/dev/null 2>&1; then
-    echo "Could not create the Python environment."
-    read -n 1 -s -r -p "Press any key to close this window."
+    echo "Could not create the Python environment. Check your internet connection and try again."
+    [ -t 0 ] && read -n 1 -s -r -p "Press any key to close this window."
     exit 1
   fi
 fi
@@ -77,9 +78,8 @@ if [ "$WANT" != "$HAVE" ]; then
     echo "$WANT" > "$STAMP"
   else
     echo ""
-    echo "Could not install the required libraries."
-    echo "Check your internet connection and run this again."
-    read -n 1 -s -r -p "Press any key to close this window."
+    echo "Could not install the required libraries. Check your internet connection and try again."
+    [ -t 0 ] && read -n 1 -s -r -p "Press any key to close this window."
     exit 1
   fi
 fi

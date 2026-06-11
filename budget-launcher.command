@@ -44,8 +44,9 @@ resolve_input() {
 }
 
 # Find the app/ folder with no hardcoded path. Order:
-#   env override, remembered path, this script's own dir, common spots,
-#   a search under the home folder and /Applications.
+#   env override, remembered path, this script's own dir, common spots.
+# The slower disk search lives in deep_search below and only runs when
+# the user says they already have a copy somewhere unusual.
 find_app_dir() {
   if [ -n "$BUDGET_APP_DIR" ] && [ -f "$BUDGET_APP_DIR/run.command" ]; then
     printf '%s\n' "$BUDGET_APP_DIR"; return 0
@@ -67,10 +68,19 @@ find_app_dir() {
     "/Applications/budget-app/app"; do
     [ -f "$g/run.command" ] && { printf '%s\n' "$g"; return 0; }
   done
-  local hit
-  hit="$(find "$HOME" "/Applications" -type f -name run.command -path '*/budget-app/app/run.command' 2>/dev/null | head -n 1)"
-  [ -n "$hit" ] && { printf '%s\n' "$(cd "$(dirname "$hit")" && pwd)"; return 0; }
   return 1
+}
+
+# Bounded look around the disk for a copy in an unusual spot. Runs only after the
+# user declines the install offer (so it never delays a normal launch), skips the
+# huge Library and Trash trees, and remembers a hit so it never has to run twice.
+deep_search() {
+  local hit
+  hit="$(find "$HOME" "/Applications" -maxdepth 6 \( -path "$HOME/Library" -o -name .Trash \) -prune -o -type f -path '*/budget-app/app/run.command' -print 2>/dev/null | head -n 1)"
+  [ -z "$hit" ] && return 1
+  hit="$(cd "$(dirname "$hit")" && pwd)"
+  printf '%s' "$hit" > "$CONFIG_FILE" 2>/dev/null
+  printf '%s\n' "$hit"
 }
 
 # Last resort: ask the user to type/paste the path, then remember it for next time.
@@ -96,7 +106,9 @@ prompt_for_path() {
 
 # Not installed anywhere? Offer to download it from GitHub into ~/budget-app/app.
 # Needs Git (macOS installs it on first use). Code only, the data folder is made
-# later on first run. Echoes the new app/ dir, or returns 1.
+# later on first run. Echoes the new app/ dir. Returns 1 if the user declined,
+# 2 if the install was tried and failed (the user was already told why, so the
+# caller must stop instead of asking them for a path they do not have).
 offer_install() {
   local ans
   ans="$(osascript \
@@ -108,25 +120,37 @@ offer_install() {
     -e 'end try' 2>/dev/null)"
   [ "$ans" != "Install" ] && return 1
 
-  if ! command -v git >/dev/null 2>&1; then
+  # just looking up a git command is not a real test on macOS: /usr/bin/git always
+  # exists as an Apple stub, even before the Command Line Tools are installed, so it
+  # says yes on Macs where git cannot actually run. Check for the tools themselves.
+  if ! xcode-select -p >/dev/null 2>&1; then
     xcode-select --install >/dev/null 2>&1
     note "Budget needs Git to install and keep itself updated. A macOS Command Line Tools window should appear, click Install, wait for it to finish, then open Budget again."
-    return 1
+    return 2
   fi
 
   osascript -e 'display notification "Downloading Budget. This takes a few minutes and it will open by itself when ready." with title "Budget"' >/dev/null 2>&1
   mkdir -p "$INSTALL_PARENT"
+  # a leftover folder from an earlier failed attempt would make git clone refuse,
+  # move it aside (never delete, it could hold anything)
+  if [ -e "$INSTALL_PARENT/app" ]; then
+    mv "$INSTALL_PARENT/app" "$INSTALL_PARENT/app.old.$(date +%s)" 2>/dev/null
+  fi
   if git clone "$REPO_URL" "$INSTALL_PARENT/app" >/dev/null 2>&1 && [ -f "$INSTALL_PARENT/app/run.command" ]; then
     printf '%s' "$INSTALL_PARENT/app" > "$CONFIG_FILE" 2>/dev/null   # remember it
     printf '%s\n' "$INSTALL_PARENT/app"; return 0
   fi
   note "Budget could not be downloaded. Check your internet connection and open Budget again."
-  return 1
+  return 2
 }
 
 APP_DIR="$(find_app_dir)"
-[ -z "$APP_DIR" ] && APP_DIR="$(offer_install)"    # not installed yet? download it
-[ -z "$APP_DIR" ] && APP_DIR="$(prompt_for_path)"  # or point at an existing copy
+if [ -z "$APP_DIR" ]; then
+  APP_DIR="$(offer_install)"                       # not installed yet? download it
+  [ $? -eq 2 ] && exit 1                           # tried and failed, already explained
+fi
+[ -z "$APP_DIR" ] && APP_DIR="$(deep_search)"      # declined: maybe a copy in an odd spot
+[ -z "$APP_DIR" ] && APP_DIR="$(prompt_for_path)"  # or have them point at it
 if [ -z "$APP_DIR" ]; then
   note "Budget needs the location of its folder to start. Open Budget again when you can point it to the budget-app folder."
   exit 1
@@ -209,7 +233,10 @@ export BUDGET_APP_MANAGED=1
 # AND REQUIRED_LAUNCHER_VERSION in app.py together, only for a launcher change that truly needs
 # a reinstall.
 export BUDGET_LAUNCHER_VERSION=1
-bash "$RUN" >/dev/null 2>&1 &
+# keep the setup output so a failure can say what actually went wrong
+# ($TMPDIR is per-user on macOS, so no clash on shared Macs)
+LOG="${TMPDIR:-/tmp}/budget-launch.log"
+bash "$RUN" >"$LOG" 2>&1 &
 RUN_PID=$!
 
 # 3. Wait for the server. Succeed when it answers, fail fast if the
@@ -218,7 +245,13 @@ tries=0
 until server_up; do
   if ! kill -0 "$RUN_PID" 2>/dev/null; then
     kill_app
-    note "Budget couldn't finish starting. If this was the first launch, check your internet connection, then open Budget again."
+    # pull the setup script's own plain-words error line out of the log, if any
+    err="$(grep '^Could not' "$LOG" 2>/dev/null | tail -n 1 | tr -d '"\\')"
+    if [ -n "$err" ]; then
+      note "Budget couldn't finish starting. $err Open Budget again to retry."
+    else
+      note "Budget couldn't finish starting. If this was the first launch, check your internet connection, then open Budget again."
+    fi
     exit 1
   fi
   tries=$((tries + 1))
@@ -243,7 +276,7 @@ EOF
 
 if [ -z "$winID" ]; then
   kill_app
-  note "Budget needs permission to control Safari. Open System Settings > Privacy & Security > Automation, allow this app to control Safari, then launch Budget again."
+  note "Budget needs permission to control Safari. Open System Settings (System Preferences on older Macs) > Privacy & Security > Automation, allow Budget to control Safari, then launch Budget again."
   exit 1
 fi
 
