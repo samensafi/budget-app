@@ -1145,8 +1145,9 @@ def _render_home_inner():
         ui.button(icon="chevron_right", on_click=_next_month) \
             .props("flat round dense").classes("justify-self-end")
 
-    # KPI cards (3-wide). Balance is green when >= 0, red when negative.
-    balance_cls = "income" if summary["net"] >= 0 else "expense"
+    # KPI cards (3-wide). Balance is green when >= 0, red when negative. Color follows
+    # the rounded number on the card, so float drift can never paint a red $0.
+    balance_cls = "income" if round(summary["net"]) >= 0 else "expense"
     with ui.row().classes("w-full gap-3 no-wrap").style("margin-top: 12px;"):
         for label, value, cls in [
             ("Income",   bb.money(summary["income"], rounded=True),   "income"),
@@ -2136,7 +2137,7 @@ def open_search_drawer():
                     # over all matches, not just the 50 shown. re-renders every keystroke.
                     n = len(rows)
                     total = sum(r["amount"] for r in rows)
-                    total_cls = "income" if total >= 0 else "expense"
+                    total_cls = "income" if round(total) >= 0 else "expense"  # match the shown rounded total
                     ui.html(
                         "<div class='bb-search-summary'>"
                         f"<span class='label'>{n} transaction{'s' if n != 1 else ''}:</span>"
@@ -2245,7 +2246,7 @@ def _render_insights_inner():
     expenses = float(-df.loc[df["amount"] < 0, "amount"].sum())
     net = income - expenses
 
-    balance_cls = "income" if net >= 0 else "expense"
+    balance_cls = "income" if round(net) >= 0 else "expense"  # same drift guard as Home
     with ui.row().classes("w-full gap-3 no-wrap").style("margin-top: 10px;"):
         for label, value, cls in [
             ("Income",   bb.money(income, rounded=True),   "income"),

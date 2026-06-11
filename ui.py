@@ -31,11 +31,13 @@ def money(amount: float, *, signed: bool = False, rounded: bool = False) -> str:
     # $174.50 shows as $174.5, and $4.33 keeps both digits (via amount_str).
     body = f"{abs(amount):,.0f}" if rounded else amount_str(amount)
     if signed:
+        # anything that renders as zero shows a plain $0, never +$0 or −$0
+        # (float drift in sums must not put a sign on a zero)
+        if body.strip("0,.") == "":
+            return "$0"
         if amount > 0:
             return f"+${body}"
-        if amount < 0:
-            return f"−${body}"
-        return "$0"
+        return f"−${body}"
     return f"${body}"
 
 
