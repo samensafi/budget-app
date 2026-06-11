@@ -202,7 +202,21 @@ kill_app() {
   fi
 }
 
-trap 'kill_app; exit 0' INT TERM
+# Exit-time cleanup: kill only what THIS launcher started, never whatever owns the port
+# now. If the user closed the tab and reopened Budget within a few seconds, the new copy
+# has already taken over port 8080, and the old port-wide kill_app would shoot it down
+# mid-start (one confusing "couldn't finish starting" dialog). Before anything was
+# started there is nothing of ours to miss, so fall back to the aggressive cleanup.
+RUN_PID=""
+SERVER_PID=""
+kill_mine() {
+  if [ -z "$RUN_PID$SERVER_PID" ]; then kill_app; return; fi
+  kill $RUN_PID $SERVER_PID >/dev/null 2>&1
+  sleep 1
+  kill -9 $RUN_PID $SERVER_PID >/dev/null 2>&1
+}
+
+trap 'kill_mine; exit 0' INT TERM
 
 # 0. Free port 8080 so Budget can always start, killing whatever holds it. If the holder
 #    is something OTHER than a leftover Budget, let the user know we're clearing it first.
@@ -247,7 +261,7 @@ RUN_PID=$!
 tries=0
 until server_up; do
   if ! kill -0 "$RUN_PID" 2>/dev/null; then
-    kill_app
+    kill_mine
     # pull the setup script's own plain-words error line out of the log, if any
     err="$(grep '^Could not' "$LOG" 2>/dev/null | tail -n 1 | tr -d '"\\')"
     if [ -n "$err" ]; then
@@ -259,12 +273,15 @@ until server_up; do
   fi
   tries=$((tries + 1))
   if [ "$tries" -ge "$MAX" ]; then
-    kill_app
+    kill_mine
     note "Budget is taking too long to start. Please open it again."
     exit 1
   fi
   sleep 0.5
 done
+# the server just answered, remember which process owns the port: that one is ours,
+# and the exit-time cleanup must touch nothing else
+SERVER_PID="$(lsof -tiTCP:$PORT -sTCP:LISTEN 2>/dev/null | head -n 1)"
 
 # 4. Open Budget in a new Safari window and bring Safari to the front.
 winID=$(osascript <<EOF 2>/dev/null
@@ -278,7 +295,7 @@ EOF
 )
 
 if [ -z "$winID" ]; then
-  kill_app
+  kill_mine
   note "Budget needs permission to control Safari. Open System Settings (System Preferences on older Macs) > Privacy & Security > Automation, allow Budget to control Safari, then launch Budget again."
   exit 1
 fi
@@ -296,5 +313,5 @@ while true; do
 done
 
 # 6. Final cleanup, then let the launcher app quit.
-kill_app
+kill_mine
 exit 0
