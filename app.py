@@ -1430,6 +1430,42 @@ def _render_transaction_row(txn: dict, cmap: dict[str, dict], *, show_date: bool
             ui.icon("delete")
 
 
+def _render_deleted_txn_card(txn: dict, cmap: dict[str, dict]) -> None:
+    # a read-only echo of the Home row (avatar, name, category, date, signed amount) so a
+    # deleted item reads the way it did before removal. the list is tighter than Home, so
+    # name and amount share the top line and category and date sit on the line below. a
+    # category deleted while this sat here keeps its original name but gets a neutral avatar.
+    cat = cmap.get(txn.get("category"), {"emoji": "❓", "color": "#6b7280"})
+    amount = float(txn.get("amount") or 0)
+    is_income = amount > 0
+    amt_str = ("+ $" if is_income else "− $") + bb.amount_str(amount)
+    amt_cls = "income" if is_income else "expense"
+    try:
+        d_str = datetime.strptime(txn["date"], "%Y-%m-%d").strftime("%b %-d, %Y")
+    except (ValueError, KeyError, TypeError):
+        d_str = str(txn.get("date") or "")
+    with ui.card().classes("bb-row bb-deleted w-full"):
+        with ui.row().classes("items-center w-full no-wrap gap-3").style("min-width: 0;"):
+            avatar_cls = "avatar duo" if bb.count_emojis(cat["emoji"]) >= 2 else "avatar"
+            ui.label(cat["emoji"]).classes(avatar_cls).style(
+                f"background: color-mix(in srgb, {cat['color']} 20%, transparent); "
+                f"border: 1px solid color-mix(in srgb, {cat['color']} 35%, transparent);"
+            )
+            with ui.column().classes("flex-grow gap-0").style("min-width: 0;"):
+                # top line: name on the left (ellipsis when long), amount pinned right.
+                with ui.row().classes("items-baseline w-full no-wrap gap-2").style("min-width: 0;"):
+                    ui.label(txn.get("merchant") or "Transaction").classes("merchant") \
+                      .style("flex: 1 1 0; min-width: 0;")
+                    ui.label(amt_str).classes(f"amount {amt_cls}").style("flex-shrink: 0;")
+                # second line: category truncates first if tight, date always stays whole.
+                with ui.row().classes("items-center gap-2 no-wrap").style("min-width: 0;"):
+                    ui.label(txn.get("category") or "Needs Review").classes("category-chip ellipsis") \
+                      .style(f"color: {cat['color']}; min-width: 0;")
+                    if d_str:
+                        ui.label(d_str).classes("text-caption text-muted") \
+                          .style("white-space: nowrap; flex-shrink: 0;")
+
+
 def _prev_month():
     if state.view_month == 1:
         state.view_month = 12
@@ -3895,20 +3931,37 @@ def _render_settings_inner():
                         ui.label("Nothing here, you're all caught up.") \
                           .classes("text-caption text-muted")
                         return
+                    cmap = cat_map()
                     for entry in entries:
-                        with ui.row().classes("items-center no-wrap w-full") \
-                                .style("gap: 10px; padding: 8px 12px; "
-                                       "background: var(--bb-surface); "
-                                       "border: 1px solid var(--bb-border); "
-                                       "border-radius: 10px;"):
-                            with ui.column().classes("col").style("gap: 2px; min-width: 0;"):
-                                ui.label(entry["label"]).classes("ellipsis") \
-                                  .style("font-weight: 600;")
+                        txns = entry.get("transactions") or []
+                        # top-align so a many-row deletion (a whole month wiped at once)
+                        # keeps its time+Restore at the top of the box instead of buried
+                        # in the vertical middle. a single row still reads centered enough.
+                        with ui.row().classes("items-start w-full").style(
+                                "gap: 10px; padding: 6px 12px; "
+                                "background: var(--bb-surface); "
+                                "border: 1px solid var(--bb-border); "
+                                "border-radius: 12px;"):
+                            # cards grow to fill, the time+Restore block stays at its size and
+                            # wraps below them on a dialog too narrow to hold both side by side.
+                            with ui.column().style("flex: 1 1 220px; min-width: 0; gap: 2px;"):
+                                if txns:
+                                    for t in txns:
+                                        _render_deleted_txn_card(t, cmap)
+                                else:
+                                    # snapshot unreadable, fall back to the stored summary
+                                    ui.label(entry["label"]).classes("merchant")
+                            # time on top, Restore directly under it, both flush to the row's
+                            # right edge so they read as one tidy right-aligned stack. the small
+                            # top pad lines the time up with the first row's text, not its top.
+                            with ui.column().style("flex-shrink: 0; margin-left: auto; "
+                                                   "align-items: flex-end; gap: 3px; "
+                                                   "padding-top: 8px;"):
                                 ui.label(_relative_time_ago(entry["deleted_at"])) \
-                                  .classes("text-caption text-muted")
-                            ui.button("Restore", icon="undo",
-                                      on_click=lambda e, eid=entry["id"]: restore_entry(eid)) \
-                              .props("flat dense color=primary")
+                                  .classes("text-caption text-muted").style("white-space: nowrap;")
+                                ui.button("Restore", icon="undo",
+                                          on_click=lambda e, eid=entry["id"]: restore_entry(eid)) \
+                                  .props("flat dense color=primary").classes("bb-restore-btn")
 
             def restore_entry(entry_id: int):
                 n = db.restore_recently_deleted(DB_PATH, entry_id)

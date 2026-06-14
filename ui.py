@@ -265,6 +265,22 @@ html, body, .q-page-container, .q-page {
 }
 .bb-row .amount.income  { color: var(--bb-income); }
 .bb-row .amount.expense { color: var(--bb-expense); }
+/* Recently deleted reuses the Home row look but is read only and chrome-less: no
+   pointer, no hover, and no card border or background, so each row sits cleanly inside
+   the grouped entry box (which carries the single border) with no box-in-box look. */
+.bb-row.bb-deleted {
+  cursor: default !important; pointer-events: none;
+  border: none !important; background: transparent !important;
+  box-shadow: none !important; padding: 6px 2px !important;
+  /* a card defaults to a wide min-width, clear it so the row shrinks to its column
+     instead of overflowing the amount into the time and Restore block beside it. */
+  min-width: 0 !important; max-width: 100% !important;
+}
+/* Restore control in the Recently deleted list. Tight padding and right-justified
+   content pull the label to the row's right edge so it sits squarely under the
+   deletion time above it instead of drifting because of the leading icon. */
+.bb-restore-btn.q-btn { padding: 2px 0 2px 4px !important; min-height: 0 !important; }
+.bb-restore-btn .q-btn__content { justify-content: flex-end; padding: 0 !important; }
 
 /* swipe to reveal quick delete on Home rows. the row is a horizontal scroll
    container whose flex children are the row content (full width) and a red trash
