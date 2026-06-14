@@ -137,7 +137,7 @@ def _expense_category_names(all_names: list[str]) -> list[str]:
 
 
 def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str,
-                  git_installed: bool = True) -> tuple[str, str]:
+                  git_installed: bool = True, remote_ahead: bool | None = None) -> tuple[str, str]:
     # turn raw git facts into what the Updates panel should show. pure so it tests without
     # a real repo. states: no_git (git itself isn't installed), not_git (this copy isn't a
     # git checkout), unknown (couldn't reach github or read the commits), current (already
@@ -153,6 +153,13 @@ def _update_state(is_repo: bool, fetch_ok: bool, local: str, remote: str,
         return ("unknown", "Couldn't reach GitHub to check for updates. Check your "
                            "internet connection and try again.")
     if local == remote:
+        return ("current", "Budget is up to date.")
+    # the commits differ, but that only means an update when github is genuinely ahead
+    # (it has commits we don't). remote_ahead is False only when this copy sits ahead of
+    # github, an unpushed local commit on a dev machine, where there's nothing to pull, so
+    # call it current. when the count couldn't be read (None) keep the old any-difference
+    # behavior so a real update is never missed.
+    if remote_ahead is False:
         return ("current", "Budget is up to date.")
     return ("available", "A new version of Budget is available.")
 

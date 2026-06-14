@@ -3493,7 +3493,16 @@ def check_for_update(do_fetch: bool = True) -> tuple[str, str]:
     ok_r, remote = _git("rev-parse", "@{u}")     # the tracked upstream (origin/main)
     if not ok_r:
         ok_r, remote = _git("rev-parse", "origin/main")
-    return _update_state(True, fetch_ok, local, remote if ok_r else "")
+    # how many commits github has that we don't. 0 means we're equal or actually ahead
+    # (an unpushed local commit on a dev machine), so there's nothing to pull. None if it
+    # can't be read, then _update_state falls back to a plain hash compare.
+    remote_ahead = None
+    if ok_r and remote:
+        ok_c, behind = _git("rev-list", "--count", f"HEAD..{remote}")
+        if ok_c and behind.isdigit():
+            remote_ahead = int(behind) > 0
+    return _update_state(True, fetch_ok, local, remote if ok_r else "",
+                         remote_ahead=remote_ahead)
 
 
 def apply_update() -> tuple[bool, str]:
