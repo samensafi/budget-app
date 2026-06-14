@@ -1457,10 +1457,11 @@ def _render_deleted_txn_card(txn: dict, cmap: dict[str, dict]) -> None:
                     ui.label(txn.get("merchant") or "Transaction").classes("merchant") \
                       .style("flex: 1 1 0; min-width: 0;")
                     ui.label(amt_str).classes(f"amount {amt_cls}").style("flex-shrink: 0;")
-                # second line: category truncates first if tight, date always stays whole.
-                with ui.row().classes("items-center gap-2 no-wrap").style("min-width: 0;"):
+                # second line mirrors the first: category on the left (truncates if tight),
+                # date pinned right so it lines up under the amount and across every row.
+                with ui.row().classes("items-center w-full no-wrap gap-2").style("min-width: 0;"):
                     ui.label(txn.get("category") or "Needs Review").classes("category-chip ellipsis") \
-                      .style(f"color: {cat['color']}; min-width: 0;")
+                      .style(f"color: {cat['color']}; flex: 1 1 0; min-width: 0;")
                     if d_str:
                         ui.label(d_str).classes("text-caption text-muted") \
                           .style("white-space: nowrap; flex-shrink: 0;")
